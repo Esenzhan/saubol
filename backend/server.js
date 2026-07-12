@@ -8,6 +8,15 @@ import chatRoutes from "./routes/chat.js";
 
 dotenv.config();
 
+// Изоляция от крашей воркеров (например, tesseract.js) при обработке одного
+// документа не должна ронять сервис для всех остальных пользователей.
+process.on("uncaughtException", (err) => {
+  console.error("Необработанное исключение:", err);
+});
+process.on("unhandledRejection", (err) => {
+  console.error("Необработанный отказ промиса:", err);
+});
+
 const app = express();
 
 app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));

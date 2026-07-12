@@ -4,7 +4,7 @@ import path from "path";
 import fs from "fs";
 import pool from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
-import { extractTextFromImage } from "../services/ocr.js";
+import { extractTextFromDocument } from "../services/ocr.js";
 import { extractBiomarkers } from "../services/ai.js";
 
 const router = Router();
@@ -48,7 +48,7 @@ router.post("/", upload.single("file"), async (req, res) => {
 
 async function processDocument(documentId, filePath, userId) {
   try {
-    const rawText = await extractTextFromImage(filePath);
+    const rawText = await extractTextFromDocument(filePath);
     const biomarkers = await extractBiomarkers(rawText);
 
     await pool.query(
