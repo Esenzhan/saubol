@@ -92,7 +92,13 @@ router.get("/:id", async (req, res) => {
     [req.params.id, req.userId]
   );
   if (result.rows.length === 0) return res.status(404).json({ error: "Документ не найден" });
-  res.json({ document: result.rows[0] });
+
+  const biomarkers = await pool.query(
+    "SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY name",
+    [req.params.id]
+  );
+
+  res.json({ document: result.rows[0], biomarkers: biomarkers.rows });
 });
 
 export default router;
