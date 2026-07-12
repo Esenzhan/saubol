@@ -34,13 +34,13 @@ export default function Chat() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-4rem)]">
-      <p className="font-display text-3xl mb-1">Ассистент</p>
+      <p className="font-display font-light tracking-tight text-3xl mb-1">Ассистент</p>
       <p className="text-ink/60 mb-6">Задайте вопрос по своим анализам и медкарте</p>
 
       <div className="flex-1 overflow-y-auto space-y-3 pr-2">
         {messages.map((m, i) => (
           <div key={i} className={`max-w-[80%] rounded-lg px-4 py-2.5 text-sm ${
-            m.role === "user" ? "ml-auto bg-moss text-white" : "bg-white border border-ink/10"
+            m.role === "user" ? "ml-auto bg-moss text-onaccent" : "bg-surface border border-ink/10"
           }`}>
             {m.content}
           </div>
@@ -58,12 +58,12 @@ export default function Chat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Спросите о своих анализах…"
-          className="flex-1 rounded-md border border-ink/15 bg-white px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-moss"
+          className="flex-1 rounded-md border border-ink/15 bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-moss"
         />
         <button
           type="submit"
           disabled={sending}
-          className="rounded-md bg-moss text-white px-5 text-sm font-medium hover:bg-moss/90 transition-colors disabled:opacity-60"
+          className="rounded-md bg-moss text-onaccent px-5 text-sm font-medium hover:bg-moss/90 transition-colors disabled:opacity-60"
         >
           {sending ? "…" : "Отправить"}
         </button>

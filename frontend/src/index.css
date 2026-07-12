@@ -5,3 +5,37 @@
 html {
   scroll-behavior: smooth;
 }
+
+:root {
+  color-scheme: light;
+  --ink: 35 42 44;
+  --bg: 238 237 226;
+  --surface: 246 245 236;
+  --accent: 39 106 99;
+  --pending: 138 90 31;
+  --danger: 156 43 34;
+  --on-accent: 255 255 255;
+}
+
+:root.dark {
+  color-scheme: dark;
+  --ink: 220 236 229;
+  --bg: 13 22 20;
+  --surface: 20 35 32;
+  --accent: 70 224 180;
+  --pending: 240 192 76;
+  --danger: 255 107 92;
+  --on-accent: 13 22 20;
+}
+
+body {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* faint oscilloscope grid, night mode only — echoes a monitor screen */
+:root.dark body {
+  background-image:
+    linear-gradient(rgb(var(--accent) / 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(var(--accent) / 0.05) 1px, transparent 1px);
+  background-size: 24px 24px;
+}

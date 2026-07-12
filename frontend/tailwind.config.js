@@ -3,15 +3,18 @@ export default {
   theme: {
     extend: {
       colors: {
-        ink: "#12261E",
-        paper: "#F2F5F1",
-        moss: "#2F5D50",
+        ink: "rgb(var(--ink) / <alpha-value>)",
+        paper: "rgb(var(--bg) / <alpha-value>)",
+        surface: "rgb(var(--surface) / <alpha-value>)",
+        moss: "rgb(var(--accent) / <alpha-value>)",
+        amber: "rgb(var(--pending) / <alpha-value>)",
+        danger: "rgb(var(--danger) / <alpha-value>)",
+        onaccent: "rgb(var(--on-accent) / <alpha-value>)",
         sage: "#8FB09E",
-        amber: "#B8863E",
       },
       fontFamily: {
-        display: ["'Fraunces'", "serif"],
-        body: ["'Inter'", "sans-serif"],
+        display: ["'Inter'", "-apple-system", "system-ui", "sans-serif"],
+        body: ["'Inter'", "-apple-system", "system-ui", "sans-serif"],
       },
     },
   },

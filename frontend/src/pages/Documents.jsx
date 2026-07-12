@@ -55,16 +55,16 @@ export default function Documents() {
 
   return (
     <div>
-      <p className="font-display text-3xl mb-1">Документы</p>
+      <p className="font-display font-light tracking-tight text-3xl mb-1">Документы</p>
       <p className="text-ink/60 mb-6">Загружайте анализы, выписки и снимки — мы распознаем и структурируем их</p>
 
-      <label className="block border-2 border-dashed border-ink/20 rounded-lg p-8 text-center cursor-pointer hover:border-moss/50 transition-colors mb-8 bg-white">
+      <label className="block border-2 border-dashed border-ink/20 rounded-lg p-8 text-center cursor-pointer hover:border-moss/50 transition-colors mb-8 bg-surface">
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.jpg,.jpeg,.png" />
         <p className="text-sm text-ink/60">
           {uploading ? "Загружаем и распознаём…" : "Нажмите, чтобы выбрать файл (PDF, JPG, PNG)"}
         </p>
       </label>
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-sm text-danger mb-4">{error}</p>}
 
       <div className="space-y-2">
         {documents.map((doc) => {
@@ -72,7 +72,7 @@ export default function Documents() {
           const detail = details[doc.id];
           const canExpand = doc.status !== "processing";
           return (
-            <div key={doc.id} className="rounded-md border border-ink/10 bg-white px-4 py-3">
+            <div key={doc.id} className="rounded-md border border-ink/10 bg-surface px-4 py-3">
               <button
                 type="button"
                 onClick={() => canExpand && toggleExpand(doc)}
@@ -82,7 +82,7 @@ export default function Documents() {
                   <span className="text-sm font-medium">{doc.original_filename}</span>
                   <span className={`text-xs px-2 py-0.5 rounded-full ${
                     doc.status === "parsed" ? "bg-moss/10 text-moss" :
-                    doc.status === "failed" ? "bg-red-100 text-red-700" : "bg-amber/10 text-amber"
+                    doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
                   }`}>
                     {doc.status === "parsed" ? "обработан" : doc.status === "failed" ? "ошибка" : "обрабатывается"}
                   </span>
@@ -98,7 +98,7 @@ export default function Documents() {
                   {!detail ? (
                     <p className="text-xs text-ink/40">Загружаем…</p>
                   ) : doc.status === "failed" ? (
-                    <p className="text-xs text-red-600">Не удалось обработать документ.</p>
+                    <p className="text-xs text-danger">Не удалось обработать документ.</p>
                   ) : (
                     <>
                       <p className="text-xs font-medium text-ink/60 mb-1">

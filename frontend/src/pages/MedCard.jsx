@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { api } from "../api/client.js";
+import { useTheme } from "../theme.jsx";
+
+const CHART_COLORS = {
+  day: { grid: "#232a2c1a", line: "#276a63" },
+  night: { grid: "#dcece51a", line: "#46e0b4" },
+};
 
 const SECTIONS = [
   { key: "diagnosis", label: "Диагнозы" },
@@ -10,6 +16,8 @@ const SECTIONS = [
 ];
 
 export default function MedCard() {
+  const { theme } = useTheme();
+  const chartColors = CHART_COLORS[theme];
   const [names, setNames] = useState([]);
   const [selectedName, setSelectedName] = useState(null);
   const [series, setSeries] = useState([]);
@@ -41,10 +49,10 @@ export default function MedCard() {
 
   return (
     <div>
-      <p className="font-display text-3xl mb-1">Медкарта</p>
+      <p className="font-display font-light tracking-tight text-3xl mb-1">Медкарта</p>
       <p className="text-ink/60 mb-8">Динамика показателей и структурированные записи</p>
 
-      <div className="rounded-lg border border-ink/10 bg-white p-5 mb-10">
+      <div className="rounded-lg border border-ink/10 bg-surface p-5 mb-10">
         <div className="flex items-center justify-between mb-4">
           <p className="font-medium">Динамика показателя</p>
           {names.length > 0 && (
@@ -62,11 +70,19 @@ export default function MedCard() {
         {series.length > 0 ? (
           <ResponsiveContainer width="100%" height={220}>
             <LineChart data={series}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#12261E1A" />
+              <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
               <YAxis tick={{ fontSize: 12 }} />
-              <Tooltip />
-              <Line type="monotone" dataKey="value" stroke="#2F5D50" strokeWidth={2} dot={{ r: 3 }} />
+              <Tooltip
+                contentStyle={{
+                  background: theme === "night" ? "#142320" : "#f6f5ec",
+                  border: `1px solid ${chartColors.grid}`,
+                  borderRadius: 6,
+                  fontSize: 12,
+                }}
+                labelStyle={{ color: theme === "night" ? "#dcece5" : "#232a2c" }}
+              />
+              <Line type="monotone" dataKey="value" stroke={chartColors.line} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
           </ResponsiveContainer>
         ) : (
@@ -79,7 +95,7 @@ export default function MedCard() {
           <p className="font-medium mb-2">{section.label}</p>
           <div className="space-y-2">
             {(entries[section.key] || []).map((entry) => (
-              <div key={entry.id} className="rounded-md border border-ink/10 bg-white px-4 py-3">
+              <div key={entry.id} className="rounded-md border border-ink/10 bg-surface px-4 py-3">
                 <p className="text-sm font-medium">{entry.title}</p>
                 {entry.details && <p className="text-xs text-ink/50 mt-0.5">{entry.details}</p>}
               </div>
