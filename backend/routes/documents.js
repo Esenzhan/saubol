@@ -65,8 +65,8 @@ async function processDocument(documentId, filePath, userId) {
 
     for (const b of biomarkers) {
       await pool.query(
-        `INSERT INTO biomarkers (user_id, document_id, name, value, unit, ref_range_low, ref_range_high, measured_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        `INSERT INTO biomarkers (user_id, document_id, name, value, unit, ref_range_low, ref_range_high, measured_at, flagged_for_review)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [
           userId,
           documentId,
@@ -76,6 +76,7 @@ async function processDocument(documentId, filePath, userId) {
           b.ref_range_low,
           b.ref_range_high,
           b.measured_at,
+          b.flagged_for_review,
         ]
       );
     }

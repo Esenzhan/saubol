@@ -34,8 +34,11 @@ CREATE TABLE IF NOT EXISTS biomarkers (
   ref_range_low NUMERIC,
   ref_range_high NUMERIC,
   measured_at DATE,
+  flagged_for_review BOOLEAN NOT NULL DEFAULT false, -- похоже на ошибку OCR/распознавания — см. isImplausibleValue в ai.js
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE biomarkers ADD COLUMN IF NOT EXISTS flagged_for_review BOOLEAN NOT NULL DEFAULT false;
 
 -- Разделы медкарты (диагнозы, лекарства, рекомендации)
 CREATE TABLE IF NOT EXISTS medcard_entries (

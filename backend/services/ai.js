@@ -3,19 +3,71 @@ import Anthropic from "@anthropic-ai/sdk";
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
 
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function toNumberOrNull(v) {
+  if (v === null || v === undefined || v === "") return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Отбрасывает мусор из ответа модели и приводит поля к ожидаемым типам.
+ * Модель иногда возвращает не-массив, дубли текста вокруг JSON или строки
+ * вместо чисел — ничего из этого не должно долетать до INSERT молча.
+ */
+function sanitizeBiomarkers(parsed) {
+  if (!Array.isArray(parsed)) return [];
+  const out = [];
+  for (const item of parsed) {
+    if (!item || typeof item.name !== "string" || !item.name.trim()) continue;
+    const value = toNumberOrNull(item.value);
+    if (value === null) continue;
+    out.push({
+      name: item.name.trim(),
+      value,
+      unit: typeof item.unit === "string" && item.unit.trim() ? item.unit.trim() : null,
+      ref_range_low: toNumberOrNull(item.ref_range_low),
+      ref_range_high: toNumberOrNull(item.ref_range_high),
+      measured_at: typeof item.measured_at === "string" && DATE_RE.test(item.measured_at) ? item.measured_at : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Эвристика на правдоподобность значения — ловит характерный класс ошибок OCR,
+ * когда десятичный разделитель "съедается" при распознавании скана
+ * (напр. "43,2%" читается как "432%"). Не пытается угадать правильное значение,
+ * только помечает подозрительные строки для проверки человеком — см.
+ * [[saubol-resolved-issues]] в памяти проекта про этот же баг, пойманный вручную.
+ */
+export function isImplausibleValue(value, unit, refLow, refHigh) {
+  if (typeof unit === "string" && unit.includes("%") && value > 100) return true;
+  if (refHigh !== null && refHigh > 0 && value > refHigh * 20) return true;
+  if (refLow !== null && refLow > 0 && value < refLow / 20) return true;
+  return false;
+}
+
 /**
  * Извлекает структурированные биомаркеры из сырого текста документа (после OCR).
- * Возвращает массив { name, value, unit, ref_range_low, ref_range_high, measured_at }.
+ * Возвращает массив { name, value, unit, ref_range_low, ref_range_high, measured_at, flagged_for_review }.
  */
 export async function extractBiomarkers(rawText) {
   const response = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 2000,
     system:
-      "Ты извлекаешь медицинские показатели из текста лабораторного анализа. " +
+      "Ты извлекаешь медицинские показатели из текста лабораторного анализа, полученного через OCR. " +
+      "Текст может содержать ошибки распознавания: пропущенные десятичные разделители (запятая/точка), " +
+      "слипшиеся цифры. Читай значения в контексте: если результат явно противоречит физическому смыслу " +
+      "(например, значение в процентах больше 100%) или на порядок выходит за пределы указанного " +
+      "референсного диапазона без явной пометки об этом в тексте — это, скорее всего, ошибка распознавания, " +
+      "а не реальный результат; в таком случае извлеки значение ровно так, как оно написано в тексте " +
+      "(не пытайся самостоятельно восстановить точку), это будет проверено отдельно. " +
       "Отвечай ТОЛЬКО валидным JSON-массивом объектов вида " +
       '{"name": string, "value": number, "unit": string, "ref_range_low": number|null, "ref_range_high": number|null, "measured_at": string|null}. ' +
-      "Никакого текста до или после JSON. Если показателей нет — верни [].",
+      "measured_at в формате YYYY-MM-DD. Никакого текста до или после JSON. Если показателей нет — верни [].",
     messages: [{ role: "user", content: rawText.slice(0, 12000) }],
   });
 
@@ -24,12 +76,18 @@ export async function extractBiomarkers(rawText) {
     .map((b) => b.text)
     .join("");
 
+  let parsed;
   try {
-    return JSON.parse(text.trim().replace(/^```json|```$/g, ""));
+    parsed = JSON.parse(text.trim().replace(/^```json|```$/g, ""));
   } catch (err) {
     console.error("Не удалось распарсить ответ модели как JSON:", text);
     return [];
   }
+
+  return sanitizeBiomarkers(parsed).map((b) => ({
+    ...b,
+    flagged_for_review: isImplausibleValue(b.value, b.unit, b.ref_range_low, b.ref_range_high),
+  }));
 }
 
 /**
