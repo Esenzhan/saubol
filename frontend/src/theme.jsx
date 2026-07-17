@@ -14,6 +14,8 @@ export function ThemeProvider({ children }) {
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "night");
     localStorage.setItem("theme", theme);
+    const meta = document.getElementById("theme-color-meta");
+    if (meta) meta.setAttribute("content", theme === "night" ? "#0d1614" : "#eeede2");
   }, [theme]);
 
   function toggleTheme() {

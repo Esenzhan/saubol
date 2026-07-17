@@ -108,7 +108,7 @@ export default function MedCard() {
       <p className="text-ink/60 mb-8">Динамика показателей и структурированные записи</p>
 
       <div className="rounded-lg border border-ink/10 bg-surface p-5 mb-10">
-        <div className="flex items-center justify-between mb-1">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
           <p className="font-medium">
             Динамика показателя{unit && <span className="text-ink/50 font-normal"> ({unit})</span>}
           </p>
@@ -116,7 +116,7 @@ export default function MedCard() {
             <select
               value={selectedName || ""}
               onChange={(e) => setSelectedName(e.target.value)}
-              className="text-sm border border-ink/15 rounded-md px-2 py-1 bg-surface"
+              className="w-full sm:w-auto max-w-full text-sm border border-ink/15 rounded-md px-2 py-1 bg-surface"
             >
               {groups.map((g) => (
                 <optgroup key={g.label} label={g.label}>

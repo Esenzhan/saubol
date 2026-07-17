@@ -9,6 +9,10 @@
         var stored = localStorage.getItem("theme");
         var isNight = stored ? stored === "night" : window.matchMedia("(prefers-color-scheme: dark)").matches;
         if (isNight) document.documentElement.classList.add("dark");
+        document.addEventListener("DOMContentLoaded", function () {
+          var meta = document.getElementById("theme-color-meta");
+          if (meta) meta.setAttribute("content", isNight ? "#0d1614" : "#eeede2");
+        });
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,8 +23,13 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 
-    <meta name="theme-color" content="#eeede2" media="(prefers-color-scheme: light)" />
-    <meta name="theme-color" content="#0d1614" media="(prefers-color-scheme: dark)" />
+    <!--
+      Driven by the app's own theme toggle (localStorage "theme"), not the
+      prefers-color-scheme media query — those are independent and a user
+      whose phone is in light mode but toggled SauBol to night mode would
+      otherwise get a stuck-white status bar. Kept in sync by theme.jsx.
+    -->
+    <meta id="theme-color-meta" name="theme-color" content="#eeede2" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
