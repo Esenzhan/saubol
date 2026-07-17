@@ -25,13 +25,26 @@ export const api = {
   listDocuments: () => request("/documents"),
   getDocument: (id) => request(`/documents/${id}`),
   openDocumentFile: async (id) => {
-    const token = getToken();
-    const res = await fetch(`${BASE_URL}/documents/${id}/file`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("Не удалось открыть файл");
-    const blob = await res.blob();
-    window.open(URL.createObjectURL(blob), "_blank");
+    // Mobile browsers (Safari in particular) only allow window.open() to
+    // succeed as a direct, synchronous result of the user's click — once
+    // we're past an `await fetch(...)`, it's no longer considered a trusted
+    // gesture and gets silently blocked. Open the tab synchronously first
+    // (before any await), then point it at the file once it's downloaded.
+    const newTab = window.open("", "_blank");
+    try {
+      const token = getToken();
+      const res = await fetch(`${BASE_URL}/documents/${id}/file`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!res.ok) throw new Error("Не удалось открыть файл");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      if (newTab) newTab.location.href = url;
+      else window.open(url, "_blank");
+    } catch (err) {
+      if (newTab) newTab.close();
+      throw err;
+    }
   },
   uploadDocument: async (file, documentType) => {
     const formData = new FormData();
