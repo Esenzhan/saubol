@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import crypto from "crypto";
 import pool from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { extractTextFromDocument } from "../services/ocr.js";
@@ -15,7 +16,13 @@ fs.mkdirSync(uploadDir, { recursive: true });
 const storage = multer.diskStorage({
   destination: uploadDir,
   filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
+    // busboy/multer decode multipart filenames as latin1 by default (RFC 7578
+    // doesn't mandate UTF-8), so non-ASCII names arrive mojibake'd — that
+    // then bloats to an invalid on-disk filename (ENAMETOOLONG) once it hits
+    // this callback. Fix the encoding, and store on disk under a random name
+    // decoupled from any user-controlled string entirely.
+    file.originalname = Buffer.from(file.originalname, "latin1").toString("utf8");
+    cb(null, `${crypto.randomUUID()}${path.extname(file.originalname)}`);
   },
 });
 const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
