@@ -1,4 +1,7 @@
-const BASE_URL = import.meta.env.VITE_API_URL || "/api";
+// VITE_API_URL is the backend's origin (e.g. https://saubol-backend.onrender.com),
+// not the full API path — /api is always appended here so the env var can't
+// be set with or without a trailing /api and silently break requests.
+const BASE_URL = `${import.meta.env.VITE_API_URL || ""}/api`;
 
 function getToken() {
   return localStorage.getItem("token");
