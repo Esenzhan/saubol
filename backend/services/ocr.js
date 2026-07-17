@@ -23,7 +23,7 @@ async function ocrImageBuffer(worker, buffer) {
  * each one. Used as a fallback when the PDF has no embedded text layer.
  */
 async function ocrScannedPdf(parser) {
-  const { pages } = await parser.getScreenshot({ imageBuffer: true, scale: 2 });
+  const { pages } = await parser.getScreenshot({ imageBuffer: true, scale: 3 });
   const worker = await createWorker("rus+eng");
   try {
     const pageTexts = [];
