@@ -1,32 +1,31 @@
 import { useEffect, useRef, useState } from "react";
+import useSWR from "swr";
 import { api } from "../api/client.js";
 
 export default function Chat() {
-  const [messages, setMessages] = useState([]);
+  const { data, mutate } = useSWR("chatHistory", () => api.getChatHistory());
+  const messages = data?.messages ?? [];
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const bottomRef = useRef();
 
   useEffect(() => {
-    api.getChatHistory().then((res) => setMessages(res.messages));
-  }, []);
-
-  useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages.length]);
 
   async function handleSend(e) {
     e.preventDefault();
     if (!input.trim()) return;
     const question = input;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    const withQuestion = [...messages, { role: "user", content: question }];
+    mutate({ messages: withQuestion }, false);
     setSending(true);
     try {
       const res = await api.sendChatMessage(question);
-      setMessages((prev) => [...prev, { role: "assistant", content: res.answer }]);
+      mutate({ messages: [...withQuestion, { role: "assistant", content: res.answer }] }, false);
     } catch (err) {
-      setMessages((prev) => [...prev, { role: "assistant", content: `Ошибка: ${err.message}` }]);
+      mutate({ messages: [...withQuestion, { role: "assistant", content: `Ошибка: ${err.message}` }] }, false);
     } finally {
       setSending(false);
     }

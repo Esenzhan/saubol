@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import useSWR from "swr";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer } from "recharts";
 import { api } from "../api/client.js";
 import { useTheme } from "../theme.jsx";
@@ -58,27 +59,22 @@ function ChartTooltip({ active, payload, colors }) {
 export default function MedCard() {
   const { theme } = useTheme();
   const chartColors = CHART_COLORS[theme];
-  const [names, setNames] = useState([]);
   const [selectedName, setSelectedName] = useState(null);
-  const [rows, setRows] = useState([]);
-  const [entries, setEntries] = useState({});
+
+  const { data: namesRes } = useSWR("biomarkerNames", () => api.listBiomarkerNames());
+  const names = namesRes?.names ?? [];
 
   useEffect(() => {
-    api.listBiomarkerNames().then((res) => {
-      setNames(res.names);
-      if (res.names.length > 0) setSelectedName(res.names[0]);
-    });
-    Promise.all(SECTIONS.map((s) => api.listMedcard(s.key))).then((results) => {
-      const map = {};
-      SECTIONS.forEach((s, i) => (map[s.key] = results[i].entries));
-      setEntries(map);
-    });
-  }, []);
+    if (!selectedName && names.length > 0) setSelectedName(names[0]);
+  }, [names, selectedName]);
 
-  useEffect(() => {
-    if (!selectedName) return;
-    api.listBiomarkers(selectedName).then((res) => setRows(res.biomarkers));
-  }, [selectedName]);
+  const { data: biomarkersRes } = useSWR(selectedName ? ["biomarkers", selectedName] : null, () =>
+    api.listBiomarkers(selectedName)
+  );
+  const rows = biomarkersRes?.biomarkers ?? [];
+
+  const sectionQueries = SECTIONS.map((s) => useSWR(["medcard", s.key], () => api.listMedcard(s.key)));
+  const entries = Object.fromEntries(SECTIONS.map((s, i) => [s.key, sectionQueries[i].data?.entries ?? []]));
 
   const groups = useMemo(() => groupNamesByCategory(names), [names]);
 

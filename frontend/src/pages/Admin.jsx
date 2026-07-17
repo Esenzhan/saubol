@@ -1,20 +1,16 @@
-import { useEffect, useState } from "react";
+import useSWR from "swr";
 import { api } from "../api/client.js";
 
 export default function Admin() {
-  const [users, setUsers] = useState(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    api.listAdminUsers().then((res) => setUsers(res.users)).catch((err) => setError(err.message));
-  }, []);
+  const { data, error } = useSWR("adminUsers", () => api.listAdminUsers());
+  const users = data?.users ?? null;
 
   return (
     <div>
       <p className="font-display font-light tracking-tight text-3xl mb-1">Админ</p>
       <p className="text-ink/60 mb-8">Все зарегистрированные аккаунты</p>
 
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {error && <p className="text-sm text-danger">{error.message}</p>}
 
       {users && (
         <div className="space-y-2">

@@ -1,22 +1,14 @@
-import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import useSWR from "swr";
 import { api } from "../api/client.js";
 
 export default function Dashboard() {
-  const [documents, setDocuments] = useState([]);
-  const [names, setNames] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { data: docRes } = useSWR("documents", () => api.listDocuments());
+  const { data: namesRes } = useSWR("biomarkerNames", () => api.listBiomarkerNames());
+  const documents = docRes?.documents ?? [];
+  const names = namesRes?.names ?? [];
 
-  useEffect(() => {
-    Promise.all([api.listDocuments(), api.listBiomarkerNames()])
-      .then(([docRes, namesRes]) => {
-        setDocuments(docRes.documents);
-        setNames(namesRes.names);
-      })
-      .finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <p className="text-ink/50">Загрузка…</p>;
+  if (!docRes || !namesRes) return <p className="text-ink/50">Загрузка…</p>;
 
   return (
     <div>
