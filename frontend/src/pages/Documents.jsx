@@ -1,39 +1,79 @@
 import { useState, useRef } from "react";
 import useSWR from "swr";
 import { api } from "../api/client.js";
+import { groupDocumentsByFolder } from "../documentFolders.js";
 
-const TYPE_LABELS = {
-  lab_result: "Анализ",
-  prescription: "Назначение",
-  imaging: "Снимок",
-  other: "Другое",
-};
+function FolderSection({ label, count, nested, children }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={nested ? "ml-4 mt-2" : "mb-3"}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between rounded-md border border-ink/10 bg-surface px-4 py-3 text-left hover:border-moss/40 transition-colors ${
+          nested ? "text-sm" : "font-medium"
+        }`}
+      >
+        <span>{label}</span>
+        <span className="text-xs text-ink/40">{count} · {open ? "свернуть" : "открыть"}</span>
+      </button>
+      {open && <div className="mt-2 space-y-2">{children}</div>}
+    </div>
+  );
+}
 
 function DocumentRow({ doc, isExpanded, onToggle }) {
   const canExpand = doc.status !== "processing";
+  const [opening, setOpening] = useState(false);
   const { data: detail } = useSWR(isExpanded ? ["document", doc.id] : null, () => api.getDocument(doc.id));
+
+  async function handleOpenOriginal(e) {
+    e.stopPropagation();
+    setOpening(true);
+    try {
+      await api.openDocumentFile(doc.id);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setOpening(false);
+    }
+  }
 
   return (
     <div className="rounded-md border border-ink/10 bg-surface px-4 py-3">
-      <button
-        type="button"
-        onClick={() => canExpand && onToggle(doc.id)}
-        className={`w-full text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium">{doc.original_filename}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${
-            doc.status === "parsed" ? "bg-moss/10 text-moss" :
-            doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
-          }`}>
-            {doc.status === "parsed" ? "обработан" : doc.status === "failed" ? "ошибка" : "обрабатывается"}
-          </span>
-        </div>
-        <p className="text-xs text-ink/40 mt-1">
-          {TYPE_LABELS[doc.document_type] || "Другое"} · {new Date(doc.created_at).toLocaleDateString("ru-RU")}
-          {canExpand && <span className="text-moss/70"> · {isExpanded ? "скрыть подробности" : "показать, что распозналось"}</span>}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => canExpand && onToggle(doc.id)}
+          className={`flex-1 min-w-0 text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
+        >
+          <span className="text-sm font-medium block">{doc.display_name || doc.original_filename}</span>
+        </button>
+        <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
+          doc.status === "parsed" ? "bg-moss/10 text-moss" :
+          doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
+        }`}>
+          {doc.status === "parsed" ? "обработан" : doc.status === "failed" ? "ошибка" : "обрабатывается"}
+        </span>
+      </div>
+      <div className="flex items-center justify-between mt-1 gap-2">
+        <p className="text-xs text-ink/40">
+          {new Date(doc.created_at).toLocaleDateString("ru-RU")}
+          {canExpand && (
+            <button type="button" onClick={() => onToggle(doc.id)} className="text-moss/70 hover:text-moss ml-1">
+              · {isExpanded ? "скрыть подробности" : "показать, что распозналось"}
+            </button>
+          )}
         </p>
-      </button>
+        <button
+          type="button"
+          onClick={handleOpenOriginal}
+          disabled={opening}
+          className="shrink-0 text-xs text-moss hover:text-moss/80 disabled:opacity-50"
+        >
+          {opening ? "открываем…" : "открыть оригинал"}
+        </button>
+      </div>
 
       {isExpanded && (
         <div className="mt-3 pt-3 border-t border-ink/10">
@@ -111,6 +151,8 @@ export default function Documents() {
     }
   }
 
+  const folders = groupDocumentsByFolder(documents);
+
   return (
     <div>
       <p className="font-display font-light tracking-tight text-3xl mb-1">Документы</p>
@@ -124,12 +166,22 @@ export default function Documents() {
       </label>
       {error && <p className="text-sm text-danger mb-4">{error}</p>}
 
-      <div className="space-y-2">
-        {documents.map((doc) => (
-          <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={toggleExpand} />
-        ))}
-        {documents.length === 0 && <p className="text-sm text-ink/50">Загруженных документов пока нет.</p>}
-      </div>
+      {folders.map((folder) => (
+        <FolderSection key={folder.label} label={folder.label} count={folder.count}>
+          {folder.subfolders
+            ? folder.subfolders.map((sub) => (
+                <FolderSection key={sub.label} label={sub.label} count={sub.documents.length} nested>
+                  {sub.documents.map((doc) => (
+                    <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={toggleExpand} />
+                  ))}
+                </FolderSection>
+              ))
+            : folder.documents.map((doc) => (
+                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={toggleExpand} />
+              ))}
+        </FolderSection>
+      ))}
+      {documents.length === 0 && <p className="text-sm text-ink/50">Загруженных документов пока нет.</p>}
     </div>
   );
 }

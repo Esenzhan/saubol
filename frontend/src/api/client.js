@@ -24,6 +24,15 @@ export const api = {
 
   listDocuments: () => request("/documents"),
   getDocument: (id) => request(`/documents/${id}`),
+  openDocumentFile: async (id) => {
+    const token = getToken();
+    const res = await fetch(`${BASE_URL}/documents/${id}/file`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (!res.ok) throw new Error("Не удалось открыть файл");
+    const blob = await res.blob();
+    window.open(URL.createObjectURL(blob), "_blank");
+  },
   uploadDocument: async (file, documentType) => {
     const formData = new FormData();
     formData.append("file", file);

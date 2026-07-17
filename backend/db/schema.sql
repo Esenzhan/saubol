@@ -20,8 +20,17 @@ CREATE TABLE IF NOT EXISTS documents (
   status TEXT DEFAULT 'processing', -- processing | parsed | failed
   raw_text TEXT, -- текст после OCR
   document_date DATE, -- дата анализа/приёма, извлечённая из документа
+  display_name TEXT, -- человекочитаемое имя ('Общий анализ крови от 22.08.2025'), генерируется автоматически
+  folder TEXT, -- папка на странице «Документы» ('Общий анализ крови (ОАК)', 'Генетика', ...)
+  file_data BYTEA, -- байты самого файла — Render не даёт постоянного диска, поэтому храним в БД
+  mime_type TEXT, -- 'application/pdf' | 'image/png' | 'image/jpeg'
   created_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS display_name TEXT;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS folder TEXT;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS file_data BYTEA;
+ALTER TABLE documents ADD COLUMN IF NOT EXISTS mime_type TEXT;
 
 -- Извлечённые биомаркеры/показатели из документов
 CREATE TABLE IF NOT EXISTS biomarkers (
