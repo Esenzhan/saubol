@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS biomarkers (
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   document_id INTEGER REFERENCES documents(id) ON DELETE CASCADE,
   name TEXT NOT NULL,        -- напр. 'Гемоглобин'
-  value NUMERIC,
+  value NUMERIC,             -- числовой результат, если применимо
+  value_text TEXT,           -- качественный результат ('не обнаружено', 'светло-жёлтый') — заполняется когда value NULL
   unit TEXT,                 -- напр. 'г/л'
   ref_range_low NUMERIC,
   ref_range_high NUMERIC,
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS biomarkers (
 );
 
 ALTER TABLE biomarkers ADD COLUMN IF NOT EXISTS flagged_for_review BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE biomarkers ADD COLUMN IF NOT EXISTS value_text TEXT;
 
 -- Разделы медкарты (диагнозы, лекарства, рекомендации)
 CREATE TABLE IF NOT EXISTS medcard_entries (

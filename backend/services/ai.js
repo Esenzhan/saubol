@@ -22,10 +22,14 @@ function sanitizeBiomarkers(parsed) {
   for (const item of parsed) {
     if (!item || typeof item.name !== "string" || !item.name.trim()) continue;
     const value = toNumberOrNull(item.value);
-    if (value === null) continue;
+    const valueText = typeof item.value_text === "string" && item.value_text.trim() ? item.value_text.trim() : null;
+    // Every result matters, including qualitative ones ("не обнаружено") — a
+    // row with neither a number nor a text reading isn't a real result, skip it.
+    if (value === null && valueText === null) continue;
     out.push({
       name: item.name.trim(),
       value,
+      value_text: value === null ? valueText : null,
       unit: typeof item.unit === "string" && item.unit.trim() ? item.unit.trim() : null,
       ref_range_low: toNumberOrNull(item.ref_range_low),
       ref_range_high: toNumberOrNull(item.ref_range_high),
@@ -43,6 +47,7 @@ function sanitizeBiomarkers(parsed) {
  * [[saubol-resolved-issues]] в памяти проекта про этот же баг, пойманный вручную.
  */
 export function isImplausibleValue(value, unit, refLow, refHigh) {
+  if (value === null || value === undefined) return false; // qualitative result, nothing to sanity-check
   if (typeof unit === "string" && unit.includes("%") && value > 100) return true;
   if (refHigh !== null && refHigh > 0 && value > refHigh * 20) return true;
   if (refLow !== null && refLow > 0 && value < refLow / 20) return true;
@@ -51,7 +56,7 @@ export function isImplausibleValue(value, unit, refLow, refHigh) {
 
 /**
  * Извлекает структурированные биомаркеры из сырого текста документа (после OCR).
- * Возвращает массив { name, value, unit, ref_range_low, ref_range_high, measured_at, flagged_for_review }.
+ * Возвращает массив { name, value, value_text, unit, ref_range_low, ref_range_high, measured_at, flagged_for_review }.
  */
 export async function extractBiomarkers(rawText) {
   const response = await anthropic.messages.create({
@@ -65,9 +70,14 @@ export async function extractBiomarkers(rawText) {
       "референсного диапазона без явной пометки об этом в тексте — это, скорее всего, ошибка распознавания, " +
       "а не реальный результат; в таком случае извлеки значение ровно так, как оно написано в тексте " +
       "(не пытайся самостоятельно восстановить точку), это будет проверено отдельно. " +
+      "Извлекай КАЖДЫЙ результат в бланке, включая качественные (не только числовые): если результат — " +
+      'текст вида "не обнаружено", "отрицательно", "прозрачная", "светло-жёлтый" и т.п., положи его в поле ' +
+      "value_text, а value оставь null. Не пропускай строки только потому, что в них нет числа — " +
+      "качественный отрицательный результат так же важен для истории болезни, как и числовой в норме. " +
       "Отвечай ТОЛЬКО валидным JSON-массивом объектов вида " +
-      '{"name": string, "value": number, "unit": string, "ref_range_low": number|null, "ref_range_high": number|null, "measured_at": string|null}. ' +
-      "measured_at в формате YYYY-MM-DD. Никакого текста до или после JSON. Если показателей нет — верни [].",
+      '{"name": string, "value": number|null, "value_text": string|null, "unit": string|null, "ref_range_low": number|null, "ref_range_high": number|null, "measured_at": string|null}. ' +
+      "Ровно одно из value/value_text должно быть заполнено. measured_at в формате YYYY-MM-DD. " +
+      "Никакого текста до или после JSON. Если показателей нет — верни [].",
     messages: [{ role: "user", content: rawText.slice(0, 12000) }],
   });
 

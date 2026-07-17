@@ -16,6 +16,12 @@ const SECTIONS = [
   { key: "allergy", label: "Аллергии" },
 ];
 
+const NEGATIVE_RESULT_RE = /^(не обнаружено|отрицательно|нет|отсутству)/i;
+
+function isNegativeResult(text) {
+  return NEGATIVE_RESULT_RE.test(text.trim());
+}
+
 function ChartDot({ cx, cy, payload, colors }) {
   if (cx == null || cy == null) return null;
   if (!payload.flagged) return <circle cx={cx} cy={cy} r={3} fill={colors.line} />;
@@ -76,15 +82,30 @@ export default function MedCard() {
 
   const groups = useMemo(() => groupNamesByCategory(names), [names]);
 
+  const numericRows = useMemo(() => rows.filter((r) => r.value !== null), [rows]);
+  const qualitativeRows = useMemo(() => rows.filter((r) => r.value === null && r.value_text), [rows]);
+
   const series = useMemo(
     () =>
-      rows.map((b) => ({
+      numericRows.map((b) => ({
         date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
         value: Number(b.value),
         unit: b.unit,
         flagged: b.flagged_for_review,
       })),
-    [rows]
+    [numericRows]
+  );
+
+  const qualitativeList = useMemo(
+    () =>
+      [...qualitativeRows]
+        .reverse()
+        .map((b) => ({
+          date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
+          text: b.value_text,
+          negative: isNegativeResult(b.value_text),
+        })),
+    [qualitativeRows]
   );
 
   const unit = rows.find((r) => r.unit)?.unit || "";
@@ -164,8 +185,22 @@ export default function MedCard() {
               />
             </LineChart>
           </ResponsiveContainer>
-        ) : (
+        ) : qualitativeList.length === 0 ? (
           <p className="text-sm text-ink/50">Нет данных для отображения. Загрузите анализы в разделе «Документы».</p>
+        ) : null}
+        {qualitativeList.length > 0 && (
+          <div className={series.length > 0 ? "mt-4 pt-4 border-t border-ink/10" : ""}>
+            <ul className="space-y-1.5">
+              {qualitativeList.map((item, i) => (
+                <li key={i} className="flex items-center justify-between text-sm gap-3">
+                  <span className="text-ink/50 shrink-0">{item.date}</span>
+                  <span className={`text-right ${item.negative ? "text-ink/70" : "text-danger font-medium"}`}>
+                    {item.text}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
