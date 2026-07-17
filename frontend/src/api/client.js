@@ -43,6 +43,8 @@ export const api = {
 
   getChatHistory: () => request("/chat"),
   sendChatMessage: (message) => request("/chat", { method: "POST", body: JSON.stringify({ message }) }),
+
+  listAdminUsers: () => request("/admin/users"),
 };
 
 export { getToken };

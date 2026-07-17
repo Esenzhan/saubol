@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useTheme } from "../theme.jsx";
 
 export default function Settings() {
@@ -34,6 +35,10 @@ export default function Settings() {
           </button>
         </div>
       </div>
+
+      <Link to="/admin" className="text-sm text-moss inline-block mt-6">
+        Админ-панель →
+      </Link>
     </div>
   );
 }

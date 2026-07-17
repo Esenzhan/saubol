@@ -7,6 +7,7 @@ import Documents from "./pages/Documents.jsx";
 import MedCard from "./pages/MedCard.jsx";
 import Chat from "./pages/Chat.jsx";
 import Settings from "./pages/Settings.jsx";
+import Admin from "./pages/Admin.jsx";
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem("token");
@@ -30,6 +31,7 @@ export default function App() {
                 <Route path="/medcard" element={<MedCard />} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/settings" element={<Settings />} />
+                <Route path="/admin" element={<Admin />} />
               </Routes>
             </Layout>
           </RequireAuth>
