@@ -13,6 +13,16 @@ const ANALYSIS_SUBFOLDERS = [
   "Комплексные анализы",
 ];
 
+// A document's stored `folder` value is either a top-level label (chosen by
+// the user at upload time, for the 3 flat folders) or an Анализы subfolder
+// (assigned by the AI classifier after processing) — never the literal
+// string "Анализы" itself. This turns that raw value into the full path a
+// human would expect to see, for the post-upload notification.
+export function folderPathLabel(folderValue) {
+  if (!folderValue) return null;
+  return ANALYSIS_SUBFOLDERS.includes(folderValue) ? `Анализы → ${folderValue}` : folderValue;
+}
+
 export const FOLDER_TREE = [
   { label: "Анализы", children: ANALYSIS_SUBFOLDERS },
   { label: "Приёмы врачей", children: null },

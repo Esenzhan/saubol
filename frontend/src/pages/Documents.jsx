@@ -1,8 +1,17 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { api } from "../api/client.js";
-import { groupDocumentsByFolder, FOLDER_META } from "../documentFolders.js";
+import { groupDocumentsByFolder, FOLDER_META, folderPathLabel } from "../documentFolders.js";
 import { documentTitle, documentSecondaryDate, documentUploadDate } from "../documentDisplay.js";
+
+// Percent ranges for the blended upload+processing progress bar. Upload
+// progress is real (byte-accurate, from XHR); processing has no equivalent
+// signal from the server (OCR + AI classification give no intermediate
+// events), so it eases toward — but never quite reaches — PROCESSING_CEILING
+// until the document list poll reports the document as parsed/failed, at
+// which point it snaps straight to 100.
+const UPLOAD_CEILING = 25;
+const PROCESSING_CEILING = 92;
 
 const HUE_CLASSES = {
   accent: "bg-moss text-onaccent",
@@ -511,20 +520,113 @@ function ReviewPanel({ documentId, onClose, onDone }) {
   );
 }
 
+// Notification card shown while a document is uploading/processing, and
+// after — with what got recognized — until dismissed. Persistent rather
+// than an auto-dismissing toast: a failure especially shouldn't disappear
+// before the user has read it.
+function UploadStatus({ upload, onClose }) {
+  if (!upload) return null;
+  const pct = Math.round(upload.progress);
+  const inProgress = upload.phase === "uploading" || upload.phase === "processing";
+
+  return (
+    <div className={`rounded-lg border p-4 mb-4 ${upload.phase === "error" ? "border-danger/30 bg-danger/5" : "border-ink/10 bg-surface"}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate">{upload.file.name}</p>
+
+          {inProgress && (
+            <>
+              <div className="h-1.5 rounded-full bg-ink/10 overflow-hidden mt-2">
+                <div className="h-full bg-moss transition-[width] duration-300 ease-out" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="text-xs text-ink/50 mt-1.5">
+                {upload.phase === "uploading" ? "загружаем" : "распознаём"} · {pct}%
+              </p>
+            </>
+          )}
+
+          {upload.phase === "done" && (
+            <p className="text-xs text-ink/60 mt-1">
+              Распознан как «{documentTitle(upload.doc)}», сохранён в папке «{folderPathLabel(upload.doc.folder) || upload.folderLabel}».
+            </p>
+          )}
+
+          {upload.phase === "error" && (
+            <p className="text-xs text-danger mt-1">
+              {upload.documentId
+                ? "Не удалось обработать документ. Файл сохранён — можно открыть оригинал в списке ниже."
+                : upload.message || "Не удалось загрузить документ."}
+            </p>
+          )}
+        </div>
+        <button type="button" onClick={onClose} className="shrink-0 text-xs text-ink/40 hover:text-ink">
+          закрыть
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function Documents() {
-  const { data: docRes, mutate: mutateDocuments } = useSWR("documents", () => api.listDocuments(), {
-    refreshInterval: (data) => (data?.documents.some((d) => d.status === "processing") ? 3000 : 0),
-  });
-  const documents = docRes?.documents ?? [];
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
   const [expandedId, setExpandedId] = useState(null);
   const [openFolderLabel, setOpenFolderLabel] = useState(null);
   const [reviewDocId, setReviewDocId] = useState(null);
+  // Tracks the single most recent upload for the progress/result banner —
+  // starting a new upload while a previous one is still processing simply
+  // replaces it; there's no queue.
+  const [activeUpload, setActiveUpload] = useState(null);
+
+  // SWR's dynamic `refreshInterval: (data) => ...` only re-evaluates from
+  // inside its own poll loop — it decides whether to schedule the *next*
+  // tick based on data at the time of the *current* tick. If no tick is
+  // running yet (interval was 0 the last time one got scheduled, e.g. at
+  // mount, before any document existed), nothing will ever restart it —
+  // there's no independent signal telling SWR "check again, something
+  // changed". A plain value sidesteps that entirely: React's own effect-dep
+  // comparison restarts the poll the moment this flips 0 → non-zero (upload
+  // begins) and stops it on non-zero → 0 (done/failed), while staying
+  // byte-identical across unrelated re-renders (e.g. the progress easer's
+  // 400ms ticks below) so it isn't torn down and restarted for no reason.
+  const { data: docRes, mutate: mutateDocuments } = useSWR("documents", () => api.listDocuments(), {
+    refreshInterval: activeUpload?.phase === "processing" ? 2000 : 0,
+  });
+  const documents = docRes?.documents ?? [];
 
   function toggleExpand(id) {
     setExpandedId((prev) => (prev === id ? null : id));
   }
+
+  // Once the byte transfer finishes there's no further signal from the
+  // server until the next document-list poll (OCR + AI classification give
+  // no intermediate progress events) — ease the bar toward
+  // PROCESSING_CEILING so it doesn't look stalled while that's in flight.
+  useEffect(() => {
+    if (activeUpload?.phase !== "processing") return;
+    const interval = setInterval(() => {
+      setActiveUpload((prev) => {
+        if (!prev || prev.phase !== "processing") return prev;
+        return { ...prev, progress: prev.progress + (PROCESSING_CEILING - prev.progress) * 0.15 };
+      });
+    }, 400);
+    return () => clearInterval(interval);
+  }, [activeUpload?.phase]);
+
+  // Watches the polled document list for the tracked upload's document
+  // flipping to parsed/failed — that's the actual "100%" signal, driven by
+  // the same refreshInterval that already polls while any doc is processing.
+  useEffect(() => {
+    if (!activeUpload?.documentId || activeUpload.phase !== "processing") return;
+    const doc = documents.find((d) => d.id === activeUpload.documentId);
+    if (!doc) return;
+    if (doc.status === "parsed") {
+      setActiveUpload((prev) => (prev?.documentId === doc.id ? { ...prev, phase: "done", progress: 100, doc } : prev));
+    } else if (doc.status === "failed") {
+      setActiveUpload((prev) => (prev?.documentId === doc.id ? { ...prev, phase: "error", doc } : prev));
+    }
+  }, [documents, activeUpload?.documentId, activeUpload?.phase]);
 
   // folderLabel передаётся при загрузке через «+» на карточке папки с
   // главной страницы раздела; внутри открытой папки берётся её label.
@@ -534,11 +636,24 @@ export default function Documents() {
     // Загрузка с карточки сразу открывает папку — там виден статус
     // «загружаем…» и появившийся документ, а не тихая фоновая работа.
     if (folderLabel !== openFolderLabel) setOpenFolderLabel(folderLabel);
+    setActiveUpload({ file, folderLabel, phase: "uploading", progress: 2, documentId: null });
     try {
-      await api.uploadDocument(file, folderLabel);
+      const { document } = await api.uploadDocument(file, folderLabel, (fraction) => {
+        setActiveUpload((prev) =>
+          prev && prev.phase === "uploading" ? { ...prev, progress: Math.max(2, fraction * UPLOAD_CEILING) } : prev
+        );
+      });
+      setActiveUpload((prev) =>
+        prev ? { ...prev, phase: "processing", progress: UPLOAD_CEILING, documentId: document.id } : prev
+      );
       await mutateDocuments();
     } catch (err) {
-      setError(err.message);
+      // Failed before the server even accepted the file (network, folder
+      // validation) — no documentId yet, so this can't come from the
+      // processing-poll effect above. Surfaced via the banner itself rather
+      // than the generic `error` paragraph, since it's right where the
+      // upload was started.
+      setActiveUpload((prev) => (prev ? { ...prev, phase: "error", message: err.message } : prev));
     } finally {
       setUploading(false);
     }
@@ -559,6 +674,7 @@ export default function Documents() {
 
   return (
     <div>
+      <UploadStatus upload={activeUpload} onClose={() => setActiveUpload(null)} />
       {!openFolder ? (
         <>
           <p className="font-display font-light tracking-tight text-3xl mb-1">Документы</p>

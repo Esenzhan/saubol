@@ -47,20 +47,34 @@ export const api = {
       throw err;
     }
   },
-  uploadDocument: async (file, folder) => {
-    const formData = new FormData();
-    formData.append("file", file);
-    formData.append("folder", folder);
-    const token = getToken();
-    const res = await fetch(`${BASE_URL}/documents`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || "Не удалось загрузить документ");
-    return data;
-  },
+  // XHR instead of fetch specifically for `upload.onprogress` — fetch has no
+  // cross-browser way to observe request-body upload progress, only
+  // response download progress, which is useless for an upload.
+  uploadDocument: (file, folder, onProgress) =>
+    new Promise((resolve, reject) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("folder", folder);
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", `${BASE_URL}/documents`);
+      const token = getToken();
+      if (token) xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.upload.onprogress = (e) => {
+        if (onProgress && e.lengthComputable) onProgress(e.loaded / e.total);
+      };
+      xhr.onload = () => {
+        let data = {};
+        try {
+          data = JSON.parse(xhr.responseText);
+        } catch {
+          // no-op — an empty/non-JSON body falls through to the status check below
+        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+        else reject(new Error(data.error || "Не удалось загрузить документ"));
+      };
+      xhr.onerror = () => reject(new Error("Не удалось загрузить документ"));
+      xhr.send(formData);
+    }),
   reviewDocument: (id, body) => request(`/documents/${id}/review`, { method: "POST", body: JSON.stringify(body) }),
   deleteDocument: (id) => request(`/documents/${id}`, { method: "DELETE" }),
 
