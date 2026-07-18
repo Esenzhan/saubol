@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 
 const NAV_ITEMS = [
@@ -60,6 +60,20 @@ export default function Layout({ children }) {
       return !c;
     });
   }
+
+  // iOS Safari sometimes fails to recompute `position: fixed` layers after
+  // an orientation change, leaving the bottom nav stranded at whatever
+  // scroll offset it had in landscape instead of snapping back to the
+  // viewport bottom. Nudging the scroll position forces it to repaint in
+  // the right place. orientationchange fires before the new viewport size
+  // is settled, so the nudge is delayed slightly.
+  useEffect(() => {
+    function refixBottomNav() {
+      window.setTimeout(() => window.scrollTo(0, window.scrollY), 100);
+    }
+    window.addEventListener("orientationchange", refixBottomNav);
+    return () => window.removeEventListener("orientationchange", refixBottomNav);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col md:flex-row">
@@ -163,11 +177,12 @@ export default function Layout({ children }) {
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `text-center px-1 py-3 text-xs transition-colors ${
+              `flex flex-col items-center gap-0.5 px-1 pt-2.5 pb-2 text-[11px] transition-colors ${
                 isActive ? "text-moss font-medium" : "text-ink/50"
               }`
             }
           >
+            <NavIcon path={item.icon} className="w-5 h-5" />
             {item.label}
           </NavLink>
         ))}
