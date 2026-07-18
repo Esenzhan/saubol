@@ -165,8 +165,11 @@ router.get("/:id", async (req, res) => {
   );
   if (result.rows.length === 0) return res.status(404).json({ error: "Документ не найден" });
 
+  // Insertion order (id) matches the order the AI read the biomarkers off
+  // the original document — alphabetical would scramble that, making it
+  // harder to cross-check the extracted values against the source file.
   const biomarkers = await pool.query(
-    "SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY name",
+    "SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY id",
     [req.params.id]
   );
 
@@ -226,7 +229,7 @@ router.post("/:id/review", async (req, res) => {
     client.release();
   }
 
-  const biomarkers = await pool.query("SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY name", [documentId]);
+  const biomarkers = await pool.query("SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY id", [documentId]);
   res.json({ biomarkers: biomarkers.rows });
 });
 

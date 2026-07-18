@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { api } from "../api/client.js";
 import { groupDocumentsByFolder, FOLDER_META } from "../documentFolders.js";
+import { documentTitle, documentSecondaryDate } from "../documentDisplay.js";
 
 const HUE_CLASSES = {
   accent: "bg-moss text-onaccent",
@@ -94,7 +95,7 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
           onClick={() => canExpand && onToggle(doc.id)}
           className={`flex-1 min-w-0 text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
         >
-          <span className="text-sm font-medium block truncate">{doc.display_name || doc.original_filename}</span>
+          <span className="text-sm font-medium block truncate">{documentTitle(doc)}</span>
         </button>
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
           doc.status === "parsed" ? "bg-moss/10 text-moss" :
@@ -105,7 +106,7 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
       </div>
       <div className="flex items-center justify-between mt-1 gap-2">
         <p className="text-xs text-ink/40">
-          {new Date(doc.created_at).toLocaleDateString("ru-RU")}
+          {documentSecondaryDate(doc)}
           {canExpand && (
             <button type="button" onClick={() => onToggle(doc.id)} className="text-moss/70 hover:text-moss ml-1">
               · {isExpanded ? "скрыть подробности" : "показать, что распозналось"}
@@ -387,7 +388,7 @@ function ReviewPanel({ documentId, onClose, onDone }) {
             закрыть
           </button>
         </div>
-        <p className="text-xs text-ink/50 mb-4">{docData?.document.display_name || docData?.document.original_filename}</p>
+        <p className="text-xs text-ink/50 mb-4">{docData && documentTitle(docData.document)}</p>
 
         {!docData || edits === null ? (
           <p className="text-sm text-ink/50">Загружаем…</p>
