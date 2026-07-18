@@ -46,10 +46,10 @@ export const api = {
       throw err;
     }
   },
-  uploadDocument: async (file, documentType) => {
+  uploadDocument: async (file, folder) => {
     const formData = new FormData();
     formData.append("file", file);
-    if (documentType) formData.append("documentType", documentType);
+    formData.append("folder", folder);
     const token = getToken();
     const res = await fetch(`${BASE_URL}/documents`, {
       method: "POST",
@@ -60,9 +60,11 @@ export const api = {
     if (!res.ok) throw new Error(data.error || "Не удалось загрузить документ");
     return data;
   },
+  reviewDocument: (id, body) => request(`/documents/${id}/review`, { method: "POST", body: JSON.stringify(body) }),
 
   listBiomarkers: (name) => request(`/records/biomarkers${name ? `?name=${encodeURIComponent(name)}` : ""}`),
   listBiomarkerNames: () => request("/records/biomarkers/names"),
+  listBiomarkerCatalog: () => request("/records/biomarkers/catalog"),
   listMedcard: (section) => request(`/records/medcard${section ? `?section=${encodeURIComponent(section)}` : ""}`),
   addMedcardEntry: (body) => request("/records/medcard", { method: "POST", body: JSON.stringify(body) }),
 

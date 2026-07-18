@@ -5,11 +5,13 @@ import { requireAuth } from "../middleware/auth.js";
 const router = Router();
 router.use(requireAuth);
 
-// Динамика конкретного показателя (для графиков)
+// Динамика конкретного показателя (для графиков). Только подтверждённые —
+// свежеизвлечённые ИИ показатели ждут проверки на экране подтверждения и
+// не должны попадать в медкарту/чат до этого.
 router.get("/biomarkers", async (req, res) => {
   const { name } = req.query;
   const params = [req.userId];
-  let query = "SELECT * FROM biomarkers WHERE user_id = $1";
+  let query = "SELECT * FROM biomarkers WHERE user_id = $1 AND confirmed = true";
   if (name) {
     params.push(name);
     query += " AND name = $2";
@@ -22,10 +24,24 @@ router.get("/biomarkers", async (req, res) => {
 // Список уникальных показателей, которые есть у пользователя
 router.get("/biomarkers/names", async (req, res) => {
   const result = await pool.query(
-    "SELECT DISTINCT name FROM biomarkers WHERE user_id = $1 ORDER BY name",
+    "SELECT DISTINCT name FROM biomarkers WHERE user_id = $1 AND confirmed = true ORDER BY name",
     [req.userId]
   );
   res.json({ names: result.rows.map((r) => r.name) });
+});
+
+// Каталог показателей для поиска при ручном добавлении на экране
+// подтверждения: имя + единица измерения из самой свежей записи с этим
+// именем — чтобы при выборе показателя единица подтягивалась сама.
+router.get("/biomarkers/catalog", async (req, res) => {
+  const result = await pool.query(
+    `SELECT DISTINCT ON (name) name, unit
+     FROM biomarkers
+     WHERE user_id = $1 AND confirmed = true
+     ORDER BY name, measured_at DESC NULLS LAST, created_at DESC`,
+    [req.userId]
+  );
+  res.json({ catalog: result.rows });
 });
 
 // Разделы медкарты (диагнозы, лекарства, рекомендации, аллергии)

@@ -20,7 +20,9 @@ router.post("/", async (req, res) => {
 
   try {
     const [biomarkersRes, medcardRes, historyRes] = await Promise.all([
-      pool.query("SELECT name, value, unit, measured_at FROM biomarkers WHERE user_id = $1", [req.userId]),
+      pool.query("SELECT name, value, unit, measured_at FROM biomarkers WHERE user_id = $1 AND confirmed = true", [
+        req.userId,
+      ]),
       pool.query("SELECT section, title, details, entry_date FROM medcard_entries WHERE user_id = $1", [req.userId]),
       pool.query(
         "SELECT role, content FROM chat_messages WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20",
