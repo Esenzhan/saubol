@@ -8,6 +8,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { extractTextFromDocument } from "../services/ocr.js";
 import { analyzeDocument } from "../services/ai.js";
 import { canonicalizeBiomarkerName } from "../services/textNormalize.js";
+import { ANALYSIS_SUBFOLDERS } from "../services/folderClassifier.js";
 
 const router = Router();
 
@@ -19,6 +20,13 @@ fs.mkdirSync(uploadDir, { recursive: true });
 // ИИ на биомаркеры; остальные три — OCR для будущего чата, без извлечения
 // показателей, папка проставляется сразу тем, что выбрал пользователь.
 const TOP_FOLDERS = ["Анализы", "Приёмы врачей", "Выписки и заключения", "Другое"];
+
+// Valid move destinations: the 3 flat top folders (never "Анализы" itself —
+// that's a group label, documents live in one of its subfolders) plus each
+// Анализы subfolder directly, so a misfiled or misclassified document can be
+// moved to exactly where it belongs without changing document_type/status
+// or re-running extraction.
+const MOVE_TARGETS = new Set([...TOP_FOLDERS.filter((f) => f !== "Анализы"), ...ANALYSIS_SUBFOLDERS]);
 
 // Столбцы без file_data — это BYTEA с самим содержимым файла, его незачем
 // (и накладно) гонять туда-обратно при каждом списке/детали документа.
@@ -261,6 +269,25 @@ router.post("/:id/review", async (req, res) => {
 
   const biomarkers = await pool.query("SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY id", [documentId]);
   res.json({ biomarkers: biomarkers.rows });
+});
+
+// Перенос документа в другую папку (или другую подпапку «Анализы») —
+// например, чтобы исправить ошибку классификации ИИ или папку, выбранную
+// при загрузке. Не трогает status/raw_text/биомаркеры — документ, который
+// не прошёл через analyzeDocument (был загружен не в «Анализы»), при
+// переносе в подпапку «Анализы» останется без показателей, извлечение не
+// запускается повторно.
+router.patch("/:id/folder", async (req, res) => {
+  const { folder } = req.body;
+  if (!MOVE_TARGETS.has(folder)) {
+    return res.status(400).json({ error: "Не указана или неизвестна папка" });
+  }
+  const result = await pool.query(
+    `UPDATE documents SET folder = $1 WHERE id = $2 AND user_id = $3 RETURNING ${DOC_COLUMNS}`,
+    [folder, req.params.id, req.userId]
+  );
+  if (result.rows.length === 0) return res.status(404).json({ error: "Документ не найден" });
+  res.json({ document: result.rows[0] });
 });
 
 // Удаление документа вместе с его биомаркерами (FK ON DELETE CASCADE).

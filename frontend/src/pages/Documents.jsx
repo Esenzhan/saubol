@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { api } from "../api/client.js";
-import { groupDocumentsByFolder, FOLDER_META, folderPathLabel } from "../documentFolders.js";
+import { groupDocumentsByFolder, FOLDER_META, folderPathLabel, MOVE_TARGETS } from "../documentFolders.js";
 import { documentTitle, documentSecondaryDate, documentUploadDate } from "../documentDisplay.js";
 
 // Percent ranges for the blended upload+processing progress bar. Upload
@@ -114,7 +114,7 @@ function biomarkerDeviation(b) {
   return null;
 }
 
-function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete }) {
+function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete, onMove }) {
   const canExpand = doc.status !== "processing";
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -252,14 +252,23 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete }) {
           {detail && (
             <div className="flex items-center justify-between mt-3 pt-2 border-t border-ink/5">
               <p className="text-xs text-ink/40">Загружен {documentUploadDate(doc)}</p>
-              <button
-                type="button"
-                onClick={handleDelete}
-                disabled={deleting}
-                className="text-xs text-danger/70 hover:text-danger disabled:opacity-50 transition-colors"
-              >
-                {deleting ? "удаляем…" : "удалить документ"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => onMove(doc.id)}
+                  className="text-xs text-moss/80 hover:text-moss transition-colors"
+                >
+                  перенести
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="text-xs text-danger/70 hover:text-danger disabled:opacity-50 transition-colors"
+                >
+                  {deleting ? "удаляем…" : "удалить"}
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -287,7 +296,7 @@ function FolderSection({ label, count, nested, children }) {
   );
 }
 
-function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggle, onReview, onDelete }) {
+function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggle, onReview, onDelete, onMove }) {
   return (
     <div>
       <button type="button" onClick={onBack} className="text-sm text-ink/50 hover:text-ink mb-3 inline-flex items-center gap-1">
@@ -302,12 +311,12 @@ function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggl
         ? folder.subfolders.map((sub) => (
             <FolderSection key={sub.label} label={sub.label} count={sub.documents.length} nested={false}>
               {sub.documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} />
+                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} onMove={onMove} />
               ))}
             </FolderSection>
           ))
         : folder.documents.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} />
+            <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} onMove={onMove} />
           ))}
 
       {folder.count === 0 && <p className="text-sm text-ink/50">В этой папке пока нет документов.</p>}
@@ -395,6 +404,68 @@ function AddBiomarkerPicker({ catalog, onPick, onClose }) {
         <button type="button" onClick={onClose} className="text-xs text-ink/50 hover:text-ink shrink-0">
           отмена
         </button>
+      </div>
+    </div>
+  );
+}
+
+function MoveDocumentPanel({ doc, onClose, onMove }) {
+  const [query, setQuery] = useState("");
+  const [moving, setMoving] = useState(false);
+  const [error, setError] = useState("");
+
+  const targets = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return MOVE_TARGETS.filter((t) => t.value !== doc.folder && (!q || t.label.toLowerCase().includes(q)));
+  }, [query, doc.folder]);
+
+  async function handlePick(target) {
+    setMoving(true);
+    setError("");
+    try {
+      await onMove(doc.id, target.value);
+    } catch (err) {
+      setError(err.message);
+      setMoving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+      <div className="bg-paper w-full max-w-md rounded-lg max-h-[85vh] overflow-y-auto p-5">
+        <div className="flex items-center justify-between mb-1">
+          <p className="font-display font-light tracking-tight text-xl">Перенести документ</p>
+          <button type="button" onClick={onClose} className="text-ink/40 hover:text-ink text-sm">
+            закрыть
+          </button>
+        </div>
+        <p className="text-xs text-ink/50 mb-4 truncate">{documentTitle(doc)}</p>
+
+        <input
+          autoFocus
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Поиск папки…"
+          className="w-full text-base bg-surface border border-ink/15 rounded-md px-2 py-1.5 mb-2"
+        />
+
+        {error && <p className="text-sm text-danger mb-2">{error}</p>}
+
+        <div className="space-y-0.5">
+          {targets.map((t) => (
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => handlePick(t)}
+              disabled={moving}
+              className="w-full text-left text-sm px-3 py-2 rounded-md hover:bg-surface disabled:opacity-50 transition-colors"
+            >
+              {t.label}
+            </button>
+          ))}
+          {targets.length === 0 && <p className="text-sm text-ink/40 px-3 py-2">Ничего не найдено</p>}
+        </div>
       </div>
     </div>
   );
@@ -574,6 +645,7 @@ export default function Documents() {
   const [expandedId, setExpandedId] = useState(null);
   const [openFolderLabel, setOpenFolderLabel] = useState(null);
   const [reviewDocId, setReviewDocId] = useState(null);
+  const [moveDocId, setMoveDocId] = useState(null);
   // Tracks the single most recent upload for the progress/result banner —
   // starting a new upload while a previous one is still processing simply
   // replaces it; there's no queue.
@@ -669,6 +741,16 @@ export default function Documents() {
     }
   }
 
+  // Doesn't catch — MoveDocumentPanel awaits this itself so it can show the
+  // error inline and stay open, instead of the panel silently closing on a
+  // failed move.
+  async function handleMove(id, folder) {
+    await api.moveDocument(id, folder);
+    setExpandedId(null);
+    setMoveDocId(null);
+    await mutateDocuments();
+  }
+
   const folders = groupDocumentsByFolder(documents);
   const openFolder = folders.find((f) => f.label === openFolderLabel);
 
@@ -695,6 +777,7 @@ export default function Documents() {
           onToggle={toggleExpand}
           onReview={setReviewDocId}
           onDelete={handleDelete}
+          onMove={setMoveDocId}
         />
       )}
       {error && <p className="text-sm text-danger mt-4">{error}</p>}
@@ -707,6 +790,14 @@ export default function Documents() {
             setReviewDocId(null);
             await mutateDocuments();
           }}
+        />
+      )}
+
+      {moveDocId && documents.find((d) => d.id === moveDocId) && (
+        <MoveDocumentPanel
+          doc={documents.find((d) => d.id === moveDocId)}
+          onClose={() => setMoveDocId(null)}
+          onMove={handleMove}
         />
       )}
     </div>

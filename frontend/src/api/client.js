@@ -76,6 +76,7 @@ export const api = {
       xhr.send(formData);
     }),
   reviewDocument: (id, body) => request(`/documents/${id}/review`, { method: "POST", body: JSON.stringify(body) }),
+  moveDocument: (id, folder) => request(`/documents/${id}/folder`, { method: "PATCH", body: JSON.stringify({ folder }) }),
   deleteDocument: (id) => request(`/documents/${id}`, { method: "DELETE" }),
 
   listBiomarkers: (name) => request(`/records/biomarkers${name ? `?name=${encodeURIComponent(name)}` : ""}`),

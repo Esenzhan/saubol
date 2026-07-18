@@ -30,6 +30,17 @@ export const FOLDER_TREE = [
   { label: "Другое", children: null },
 ];
 
+// Every place a document can be moved to: the 3 flat folders as-is, plus
+// each Анализы subfolder individually (never the bare "Анализы" label —
+// documents live in one of its subfolders, not directly in the group).
+// `value` is what's stored in `documents.folder`; `label` is what a picker
+// shows, reusing the same "Анализы → X" phrasing as folderPathLabel above.
+export const MOVE_TARGETS = FOLDER_TREE.flatMap((node) =>
+  node.children
+    ? node.children.map((sub) => ({ value: sub, label: `${node.label} → ${sub}` }))
+    : [{ value: node.label, label: node.label }]
+);
+
 const OTHER_LABEL = "Другое";
 
 // Icon + accent colour for each top-level folder card. Colours reuse the
