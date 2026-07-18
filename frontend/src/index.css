@@ -6,6 +6,18 @@ html {
   scroll-behavior: smooth;
 }
 
+/* The page itself only ever scrolls vertically — a diagonal swipe shouldn't
+   drag it sideways too. Elements that intentionally scroll horizontally
+   (wide tables, etc.) opt back in with .scroll-x below. */
+html, body {
+  touch-action: pan-y;
+  overscroll-behavior-x: none;
+}
+
+.scroll-x {
+  touch-action: pan-x;
+}
+
 /* Hide the native scrollbar chrome everywhere (mobile's edge indicator,
    desktop's persistent gutter) while leaving scrolling itself untouched. */
 * {

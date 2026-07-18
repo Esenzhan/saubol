@@ -78,10 +78,15 @@ export default function Layout({ children }) {
 
       {/* pl-[env(...)] absorbs the notch/Dynamic Island when it lands on this
           edge after rotating landscape — 0 on devices/orientations without
-          one, so it's a no-op everywhere else. */}
+          one, so it's a no-op everywhere else. Width adds that same inset
+          on top of the base size (not just padding inside a fixed width) —
+          otherwise, with border-box sizing, the safe-area padding eats into
+          the content box instead of the aside growing to fit it, squeezing
+          the icons and throwing the border/divider off from where the
+          content actually ends. */}
       <aside
         className={`hidden md:flex shrink-0 border-r border-ink/10 bg-paper/80 flex-col pl-[env(safe-area-inset-left)] transition-[width] duration-200 ${
-          collapsed ? "w-16" : "w-60"
+          collapsed ? "w-[calc(4rem+env(safe-area-inset-left))]" : "w-[calc(15rem+env(safe-area-inset-left))]"
         }`}
       >
         <div className={`flex items-center gap-2 py-7 ${collapsed ? "px-3 justify-center" : "px-6 justify-between"}`}>

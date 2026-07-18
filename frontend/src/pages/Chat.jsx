@@ -20,7 +20,7 @@ const MARKDOWN_COMPONENTS = {
   hr: () => <hr className="border-ink/10 my-3" />,
   code: ({ children }) => <code className="bg-ink/10 rounded px-1 py-0.5 text-xs font-mono">{children}</code>,
   table: ({ children }) => (
-    <div className="overflow-x-auto mb-2 rounded border border-ink/10">
+    <div className="scroll-x overflow-x-auto mb-2 rounded border border-ink/10">
       <table className="w-full text-xs border-collapse">{children}</table>
     </div>
   ),
