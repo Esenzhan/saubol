@@ -47,7 +47,7 @@ function DocumentRow({ doc, isExpanded, onToggle }) {
           onClick={() => canExpand && onToggle(doc.id)}
           className={`flex-1 min-w-0 text-left ${canExpand ? "cursor-pointer" : "cursor-default"}`}
         >
-          <span className="text-sm font-medium block">{doc.display_name || doc.original_filename}</span>
+          <span className="text-sm font-medium block truncate">{doc.display_name || doc.original_filename}</span>
         </button>
         <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
           doc.status === "parsed" ? "bg-moss/10 text-moss" :
