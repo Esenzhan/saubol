@@ -1,20 +1,46 @@
 import { createWorker } from "tesseract.js";
 import fs from "fs";
 import path from "path";
+import sharp from "sharp";
 import { PDFParse } from "pdf-parse";
 
 // Bare page-marker output from pdf-parse ("-- 1 of 3 --") with nothing else
 // means the PDF has no text layer — it's a scan/photo wrapped in a PDF.
 const MIN_MEANINGFUL_TEXT_LENGTH = 30;
 
+// Phone photos of paper lab reports are the case OCR actually struggles
+// with (KDL's own PDFs already have a text layer and skip OCR entirely —
+// see isMeaningfulText below). Below this width Tesseract tends to lose
+// thin table borders and small print, so scale up before recognizing.
+const OCR_MIN_WIDTH = 2000;
+
 function isMeaningfulText(text) {
   return text.replace(/--\s*\d+\s*of\s*\d+\s*--/g, "").trim().length >= MIN_MEANINGFUL_TEXT_LENGTH;
 }
 
+/**
+ * Cheap, safe preprocessing pass before handing an image to Tesseract:
+ * auto-rotate by EXIF orientation (sideways phone photos are common),
+ * grayscale, stretch contrast, sharpen text edges, and upscale small
+ * images. Deliberately skips binarization/thresholding — a global
+ * black/white cutoff reliably wrecks phone photos with uneven lighting
+ * or a shadow across the page, which is worse than leaving it grayscale.
+ */
+async function preprocessForOcr(buffer) {
+  const image = sharp(buffer).rotate();
+  const { width } = await image.metadata();
+  let pipeline = image.grayscale().normalize().sharpen();
+  if (width && width < OCR_MIN_WIDTH) {
+    pipeline = pipeline.resize({ width: OCR_MIN_WIDTH, kernel: sharp.kernel.lanczos3 });
+  }
+  return pipeline.toBuffer();
+}
+
 async function ocrImageBuffer(worker, buffer) {
+  const processed = await preprocessForOcr(buffer);
   const {
     data: { text },
-  } = await worker.recognize(buffer);
+  } = await worker.recognize(processed);
   return text;
 }
 
@@ -59,7 +85,7 @@ export async function extractTextFromDocument(filePath) {
 
   const worker = await createWorker("rus+eng");
   try {
-    return await ocrImageBuffer(worker, filePath);
+    return await ocrImageBuffer(worker, fs.readFileSync(filePath));
   } finally {
     await worker.terminate();
   }
