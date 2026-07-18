@@ -75,14 +75,16 @@ function sanitizeClassification(parsed) {
   const displayName =
     typeof parsed?.display_name === "string" && parsed.display_name.trim() ? parsed.display_name.trim() : null;
   const folder = FOLDERS.includes(parsed?.folder) ? parsed.folder : "Другое";
-  return { displayName, folder };
+  const documentDate =
+    typeof parsed?.document_date === "string" && DATE_RE.test(parsed.document_date) ? parsed.document_date : null;
+  return { displayName, folder, documentDate };
 }
 
 /**
  * Извлекает биомаркеры и классифицирует документ (папка + человекочитаемое
- * название) одним запросом к модели — экономит токены по сравнению с двумя
- * отдельными вызовами.
- * Возвращает { displayName, folder, biomarkers: [...] }.
+ * название + дата для сортировки) одним запросом к модели — экономит токены
+ * по сравнению с несколькими отдельными вызовами.
+ * Возвращает { displayName, folder, documentDate, biomarkers: [...] }.
  */
 export async function analyzeDocument(rawText) {
   const response = await anthropic.messages.create({
@@ -93,6 +95,8 @@ export async function analyzeDocument(rawText) {
       "1) Классифицируешь документ: display_name — короткое человекочитаемое название вида " +
       '"Общий анализ крови от 22.08.2025" или "Выписка из истории болезни № 651 от 09.03.2011" ' +
       "(дату бери из бланка — дату регистрации заявки/забора биоматериала/поступления, а не дату печати бланка); " +
+      "document_date — эта же дата в формате YYYY-MM-DD, отдельным полем (нужна для сортировки списка документов). " +
+      "Если документ охватывает несколько дат (архив за период, дневник) — возьми самую позднюю дату из документа. " +
       'folder — ровно одно значение из списка: ' +
       FOLDERS.map((f) => `"${f}"`).join(", ") +
       '. Если в документе несколько разнородных панелей одного приёма (например, гормоны + ОАК + IgE) — folder ' +
@@ -110,7 +114,7 @@ export async function analyzeDocument(rawText) {
       "положи его в поле value_text, а value оставь null. Не пропускай строки только потому, что в них нет " +
       "числа — качественный отрицательный результат так же важен для истории болезни, как и числовой в норме.\n\n" +
       "Отвечай ТОЛЬКО валидным JSON-объектом вида " +
-      '{"display_name": string, "folder": string, "biomarkers": [{"name": string, "value": number|null, ' +
+      '{"display_name": string, "document_date": string|null, "folder": string, "biomarkers": [{"name": string, "value": number|null, ' +
       '"value_text": string|null, "unit": string|null, "ref_range_low": number|null, "ref_range_high": number|null, ' +
       '"measured_at": string|null}]}. Ровно одно из value/value_text у каждого биомаркера должно быть заполнено. ' +
       "measured_at в формате YYYY-MM-DD. Никакого текста до или после JSON. Если показателей нет — biomarkers: [].",
@@ -127,16 +131,16 @@ export async function analyzeDocument(rawText) {
     parsed = JSON.parse(text.trim().replace(/^```json|```$/g, ""));
   } catch (err) {
     console.error("Не удалось распарсить ответ модели как JSON:", text);
-    return { displayName: null, folder: "Другое", biomarkers: [] };
+    return { displayName: null, folder: "Другое", documentDate: null, biomarkers: [] };
   }
 
-  const { displayName, folder } = sanitizeClassification(parsed);
+  const { displayName, folder, documentDate } = sanitizeClassification(parsed);
   const biomarkers = sanitizeBiomarkers(parsed?.biomarkers).map((b) => ({
     ...b,
     flagged_for_review: isImplausibleValue(b.value, b.unit, b.ref_range_low, b.ref_range_high),
   }));
 
-  return { displayName, folder, biomarkers };
+  return { displayName, folder, documentDate, biomarkers };
 }
 
 /**

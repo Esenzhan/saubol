@@ -70,11 +70,11 @@ router.post("/", upload.single("file"), async (req, res) => {
 async function processDocument(documentId, filePath, userId) {
   try {
     const rawText = await extractTextFromDocument(filePath);
-    const { displayName, folder, biomarkers } = await analyzeDocument(rawText);
+    const { displayName, folder, documentDate, biomarkers } = await analyzeDocument(rawText);
 
     await pool.query(
-      "UPDATE documents SET raw_text = $1, status = 'parsed', display_name = $2, folder = $3 WHERE id = $4",
-      [rawText, displayName, folder, documentId]
+      "UPDATE documents SET raw_text = $1, status = 'parsed', display_name = $2, folder = $3, document_date = $4 WHERE id = $5",
+      [rawText, displayName, folder, documentDate, documentId]
     );
 
     for (const b of biomarkers) {
@@ -102,8 +102,11 @@ async function processDocument(documentId, filePath, userId) {
 }
 
 router.get("/", async (req, res) => {
+  // Newest document date first — falls back to upload time for documents
+  // that don't have a parsed date yet (still processing, or classification
+  // failed), so nothing drops out of the list while it's pending.
   const result = await pool.query(
-    `SELECT ${DOC_COLUMNS} FROM documents WHERE user_id = $1 ORDER BY created_at DESC`,
+    `SELECT ${DOC_COLUMNS} FROM documents WHERE user_id = $1 ORDER BY COALESCE(document_date, created_at::date) DESC, created_at DESC`,
     [req.userId]
   );
   res.json({ documents: result.rows });
