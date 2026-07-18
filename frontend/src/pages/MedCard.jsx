@@ -25,8 +25,12 @@ function isNegativeResult(text) {
 
 function ChartDot({ cx, cy, payload, colors }) {
   if (cx == null || cy == null) return null;
-  if (!payload.flagged) return <circle cx={cx} cy={cy} r={3} fill={colors.line} />;
-  return <circle cx={cx} cy={cy} r={5} fill={colors.flagged} fillOpacity={0.25} stroke={colors.flagged} strokeWidth={2} />;
+  if (payload.flagged)
+    return <circle cx={cx} cy={cy} r={5} fill={colors.flagged} fillOpacity={0.25} stroke={colors.flagged} strokeWidth={2} />;
+  // Значение вне нормы — сплошная danger-точка: «что не в порядке» должно
+  // читаться с графика мгновенно, без сверки с пунктиром нормы.
+  if (payload.outOfRange) return <circle cx={cx} cy={cy} r={4} fill={colors.flagged} />;
+  return <circle cx={cx} cy={cy} r={3} fill={colors.line} />;
 }
 
 function BiomarkerPicker({ groups, value, onChange }) {
@@ -159,12 +163,18 @@ export default function MedCard() {
 
   const series = useMemo(
     () =>
-      numericRows.map((b) => ({
-        date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
-        value: Number(b.value),
-        unit: b.unit,
-        flagged: b.flagged_for_review,
-      })),
+      numericRows.map((b) => {
+        const value = Number(b.value);
+        const low = b.ref_range_low != null ? Number(b.ref_range_low) : null;
+        const high = b.ref_range_high != null ? Number(b.ref_range_high) : null;
+        return {
+          date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
+          value,
+          unit: b.unit,
+          flagged: b.flagged_for_review,
+          outOfRange: (low != null && value < low) || (high != null && value > high),
+        };
+      }),
     [numericRows]
   );
 
@@ -190,7 +200,9 @@ export default function MedCard() {
   // that are entirely above/below the norm push the norm band off-screen.
   // Domain entries are functions so Recharts still picks its own "nice"
   // rounded tick values around whatever min/max results (a manually padded
-  // domain with non-round numbers made Recharts render a garbage bottom tick).
+  // domain with non-round numbers made Recharts render a garbage bottom tick
+  // — that's also why the edge headroom is done in pixels via YAxis padding
+  // below, not by arithmetically padding the domain).
   const yDomain = hasRange
     ? [(dataMin) => Math.min(dataMin, refLow), (dataMax) => Math.max(dataMax, refHigh)]
     : ["auto", "auto"];
@@ -219,7 +231,10 @@ export default function MedCard() {
             <LineChart data={series} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} />
               <XAxis dataKey="date" tick={{ fontSize: 12 }} />
-              <YAxis tick={{ fontSize: 12 }} domain={yDomain} />
+              {/* padding — пиксельный запас сверху/снизу: точка на границе
+                  домена (значение выше нормы) не обрезается краем графика,
+                  а тики остаются «круглыми» (см. комментарий к yDomain). */}
+              <YAxis tick={{ fontSize: 12 }} domain={yDomain} padding={{ top: 8, bottom: 8 }} />
               <Tooltip content={<ChartTooltip colors={chartColors} />} />
               {hasRange && (
                 <ReferenceArea y1={refLow} y2={refHigh} fill={chartColors.range} fillOpacity={0.1} strokeOpacity={0} />
@@ -273,7 +288,9 @@ export default function MedCard() {
               </div>
             ))}
             {(entries[section.key] || []).length === 0 && (
-              <p className="text-sm text-ink/40">Нет записей</p>
+              <p className="text-sm text-ink/40">
+                Записей пока нет — они появляются при обработке медицинских документов (выписок, заключений).
+              </p>
             )}
           </div>
         </div>

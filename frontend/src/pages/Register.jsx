@@ -34,6 +34,7 @@ export default function Register() {
           <div>
             <label className="text-xs uppercase tracking-wide text-ink/50">Имя</label>
             <input
+              required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               className="mt-1 w-full rounded-md border border-ink/15 bg-surface px-3 py-2 focus:outline-none focus:ring-2 focus:ring-moss"

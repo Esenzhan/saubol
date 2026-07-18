@@ -21,6 +21,7 @@ async function request(path, options = {}) {
 export const api = {
   register: (body) => request("/auth/register", { method: "POST", body: JSON.stringify(body) }),
   login: (body) => request("/auth/login", { method: "POST", body: JSON.stringify(body) }),
+  me: () => request("/auth/me"),
 
   listDocuments: () => request("/documents"),
   getDocument: (id) => request(`/documents/${id}`),
@@ -61,6 +62,7 @@ export const api = {
     return data;
   },
   reviewDocument: (id, body) => request(`/documents/${id}/review`, { method: "POST", body: JSON.stringify(body) }),
+  deleteDocument: (id) => request(`/documents/${id}`, { method: "DELETE" }),
 
   listBiomarkers: (name) => request(`/records/biomarkers${name ? `?name=${encodeURIComponent(name)}` : ""}`),
   listBiomarkerNames: () => request("/records/biomarkers/names"),

@@ -107,7 +107,9 @@ export default function Layout({ children }) {
           {!collapsed && (
             <div className="min-w-0">
               <p className="font-display font-semibold text-2xl leading-none truncate">SauBol</p>
-              <p className="text-xs text-ink/50 mt-1 tracking-wide uppercase truncate">личный архив здоровья</p>
+              {/* text-[10px]: на ширине 15rem подпись в text-xs обрезалась
+                  многоточием («ЛИЧНЫЙ АРХИВ ЗДОР…») */}
+              <p className="text-[10px] text-ink/50 mt-1 tracking-wide uppercase truncate">личный архив здоровья</p>
             </div>
           )}
           <button

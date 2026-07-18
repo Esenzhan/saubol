@@ -2,7 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { api } from "../api/client.js";
 import { groupDocumentsByFolder, FOLDER_META } from "../documentFolders.js";
-import { documentTitle, documentSecondaryDate } from "../documentDisplay.js";
+import { documentTitle, documentSecondaryDate, documentUploadDate } from "../documentDisplay.js";
 
 const HUE_CLASSES = {
   accent: "bg-moss text-onaccent",
@@ -26,14 +26,38 @@ function FolderIcon({ label, className }) {
   );
 }
 
-function FolderCard({ label, count, onClick }) {
+function FolderCard({ label, count, onClick, onUpload }) {
   const hue = FOLDER_META[label]?.hue || "ink";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="rounded-lg bg-surface p-4 flex flex-col gap-3 text-left hover:opacity-90 transition-opacity"
-    >
+    <div className="relative">
+      {/* «+» — это label с файловым инпутом поверх карточки, потому что
+          кнопку в кнопку вкладывать нельзя; сама карточка остаётся обычной
+          кнопкой открытия папки. */}
+      <label
+        aria-label={`Загрузить документ в папку «${label}»`}
+        title={`Загрузить в «${label}»`}
+        className="absolute top-3 right-3 z-10 w-7 h-7 rounded-full border border-ink/15 bg-paper text-ink/50 hover:text-moss hover:border-moss/50 flex items-center justify-center cursor-pointer transition-colors"
+      >
+        <input
+          type="file"
+          className="hidden"
+          accept=".pdf,.jpg,.jpeg,.png"
+          onChange={(e) => {
+            const file = e.target.files[0];
+            if (file) onUpload(file, label);
+            e.target.value = "";
+          }}
+        />
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </label>
+      <button
+        type="button"
+        aria-label={`Открыть папку «${label}», ${count} ${count === 1 ? "документ" : "документов"}`}
+        onClick={onClick}
+        className="w-full rounded-lg bg-surface p-4 flex flex-col gap-3 text-left hover:opacity-90 transition-opacity"
+      >
       <span className={`w-9 h-9 rounded-full flex items-center justify-center ${HUE_CLASSES[hue]}`}>
         <FolderIcon label={label} className="w-5 h-5" />
       </span>
@@ -43,7 +67,8 @@ function FolderCard({ label, count, onClick }) {
           {count} {count === 1 ? "документ" : "документов"}
         </span>
       </span>
-    </button>
+      </button>
+    </div>
   );
 }
 
@@ -70,10 +95,31 @@ function UploadButton({ uploading, onSelect }) {
   );
 }
 
-function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
+// Значение вне референсного диапазона — главный сигнал для пользователя,
+// выделяется цветом и стрелкой направления в списке показателей.
+function biomarkerDeviation(b) {
+  if (b.value === null || b.value === undefined) return null;
+  const v = Number(b.value);
+  if (b.ref_range_low != null && v < Number(b.ref_range_low)) return "↓";
+  if (b.ref_range_high != null && v > Number(b.ref_range_high)) return "↑";
+  return null;
+}
+
+function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete }) {
   const canExpand = doc.status !== "processing";
   const [opening, setOpening] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { data: detail } = useSWR(isExpanded ? ["document", doc.id] : null, () => api.getDocument(doc.id));
+
+  async function handleDelete() {
+    if (!window.confirm(`Удалить «${documentTitle(doc)}» вместе с его показателями? Это действие необратимо.`)) return;
+    setDeleting(true);
+    try {
+      await onDelete(doc.id);
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleOpenOriginal(e) {
     e.stopPropagation();
@@ -97,12 +143,15 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
         >
           <span className="text-sm font-medium block truncate">{documentTitle(doc)}</span>
         </button>
-        <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
-          doc.status === "parsed" ? "bg-moss/10 text-moss" :
-          doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
-        }`}>
-          {doc.status === "parsed" ? "обработан" : doc.status === "failed" ? "ошибка" : "обрабатывается"}
-        </span>
+        {/* «обработан» — состояние по умолчанию, бейдж для него был бы шумом
+            и отъедал бы ширину у названия; показываем только отклонения. */}
+        {doc.status !== "parsed" && (
+          <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
+            doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
+          }`}>
+            {doc.status === "failed" ? "ошибка" : "обрабатывается"}
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-between mt-1 gap-2">
         <p className="text-xs text-ink/40">
@@ -147,22 +196,29 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
                     Показатели ({detail.biomarkers.length})
                   </p>
                   <div className="space-y-1 mb-3">
-                    {detail.biomarkers.map((b) => (
-                      <div key={b.id} className="flex items-center justify-between text-xs bg-paper rounded px-2 py-1">
-                        <span>{b.name}</span>
-                        <span className="text-ink/60">
-                          {b.value !== null ? (
-                            <>
-                              {b.value} {b.unit}
-                              {(b.ref_range_low != null || b.ref_range_high != null) &&
-                                ` (норма ${b.ref_range_low ?? "?"}–${b.ref_range_high ?? "?"})`}
-                            </>
-                          ) : (
-                            b.value_text
-                          )}
-                        </span>
-                      </div>
-                    ))}
+                    {detail.biomarkers.map((b) => {
+                      const deviation = biomarkerDeviation(b);
+                      return (
+                        <div key={b.id} className="flex items-center justify-between text-xs bg-paper rounded px-2 py-1">
+                          <span>{b.name}</span>
+                          <span className={deviation ? "text-danger font-medium" : "text-ink/60"}>
+                            {b.value !== null ? (
+                              <>
+                                {deviation && `${deviation} `}
+                                {b.value} {b.unit}
+                                {(b.ref_range_low != null || b.ref_range_high != null) && (
+                                  <span className="text-ink/40 font-normal">
+                                    {` (норма ${b.ref_range_low ?? "?"}–${b.ref_range_high ?? "?"})`}
+                                  </span>
+                                )}
+                              </>
+                            ) : (
+                              b.value_text
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -180,6 +236,22 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview }) {
                 <p className="text-xs text-ink/40">Документ сохранён, распознавание для него не выполняется.</p>
               )}
             </>
+          )}
+
+          {/* Вне ветки успешной загрузки деталей: удалить можно и документ,
+              который не удалось обработать — такие хочется убрать чаще всего. */}
+          {detail && (
+            <div className="flex items-center justify-between mt-3 pt-2 border-t border-ink/5">
+              <p className="text-xs text-ink/40">Загружен {documentUploadDate(doc)}</p>
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="text-xs text-danger/70 hover:text-danger disabled:opacity-50 transition-colors"
+              >
+                {deleting ? "удаляем…" : "удалить документ"}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -206,7 +278,7 @@ function FolderSection({ label, count, nested, children }) {
   );
 }
 
-function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggle, onReview }) {
+function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggle, onReview, onDelete }) {
   return (
     <div>
       <button type="button" onClick={onBack} className="text-sm text-ink/50 hover:text-ink mb-3 inline-flex items-center gap-1">
@@ -221,12 +293,12 @@ function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggl
         ? folder.subfolders.map((sub) => (
             <FolderSection key={sub.label} label={sub.label} count={sub.documents.length} nested={false}>
               {sub.documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} />
+                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} />
               ))}
             </FolderSection>
           ))
         : folder.documents.map((doc) => (
-            <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} />
+            <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} />
           ))}
 
       {folder.count === 0 && <p className="text-sm text-ink/50">В этой папке пока нет документов.</p>}
@@ -454,16 +526,31 @@ export default function Documents() {
     setExpandedId((prev) => (prev === id ? null : id));
   }
 
-  async function handleUpload(file) {
+  // folderLabel передаётся при загрузке через «+» на карточке папки с
+  // главной страницы раздела; внутри открытой папки берётся её label.
+  async function handleUpload(file, folderLabel = openFolderLabel) {
     setUploading(true);
     setError("");
+    // Загрузка с карточки сразу открывает папку — там виден статус
+    // «загружаем…» и появившийся документ, а не тихая фоновая работа.
+    if (folderLabel !== openFolderLabel) setOpenFolderLabel(folderLabel);
     try {
-      await api.uploadDocument(file, openFolderLabel);
+      await api.uploadDocument(file, folderLabel);
       await mutateDocuments();
     } catch (err) {
       setError(err.message);
     } finally {
       setUploading(false);
+    }
+  }
+
+  async function handleDelete(id) {
+    try {
+      await api.deleteDocument(id);
+      setExpandedId(null);
+      await mutateDocuments();
+    } catch (err) {
+      setError(err.message);
     }
   }
 
@@ -478,7 +565,7 @@ export default function Documents() {
           <p className="text-ink/60 mb-6">Загружайте анализы, выписки и снимки — мы распознаем и структурируем их</p>
           <div className="grid grid-cols-2 gap-3">
             {folders.map((f) => (
-              <FolderCard key={f.label} label={f.label} count={f.count} onClick={() => setOpenFolderLabel(f.label)} />
+              <FolderCard key={f.label} label={f.label} count={f.count} onClick={() => setOpenFolderLabel(f.label)} onUpload={handleUpload} />
             ))}
           </div>
         </>
@@ -491,6 +578,7 @@ export default function Documents() {
           expandedId={expandedId}
           onToggle={toggleExpand}
           onReview={setReviewDocId}
+          onDelete={handleDelete}
         />
       )}
       {error && <p className="text-sm text-danger mt-4">{error}</p>}

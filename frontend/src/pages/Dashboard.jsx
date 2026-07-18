@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
 import useSWR from "swr";
 import { api } from "../api/client.js";
-import { documentTitle } from "../documentDisplay.js";
+import { documentTitle, documentSecondaryDate } from "../documentDisplay.js";
 
 export default function Dashboard() {
   const { data: docRes } = useSWR("documents", () => api.listDocuments());
@@ -35,12 +35,18 @@ export default function Dashboard() {
         {documents.slice(0, 5).map((doc) => (
           <div key={doc.id} className="flex items-center justify-between gap-3 rounded-md border border-ink/10 bg-surface px-4 py-3">
             <span className="text-sm truncate min-w-0">{documentTitle(doc)}</span>
-            <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
-              doc.status === "parsed" ? "bg-moss/10 text-moss" :
-              doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
-            }`}>
-              {doc.status === "parsed" ? "обработан" : doc.status === "failed" ? "ошибка" : "обрабатывается"}
-            </span>
+            {/* Дата с самого документа отличает одноимённые анализы в списке;
+                бейдж статуса показывается только для отклонений — «обработан»
+                у каждой строки был бы шумом. */}
+            {doc.status === "parsed" ? (
+              <span className="shrink-0 text-xs text-ink/40">{documentSecondaryDate(doc)}</span>
+            ) : (
+              <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full ${
+                doc.status === "failed" ? "bg-danger/10 text-danger" : "bg-amber/10 text-amber"
+              }`}>
+                {doc.status === "failed" ? "ошибка" : "обрабатывается"}
+              </span>
+            )}
           </div>
         ))}
         {documents.length === 0 && (

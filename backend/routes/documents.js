@@ -242,6 +242,16 @@ router.post("/:id/review", async (req, res) => {
   res.json({ biomarkers: biomarkers.rows });
 });
 
+// Удаление документа вместе с его биомаркерами (FK ON DELETE CASCADE).
+router.delete("/:id", async (req, res) => {
+  const result = await pool.query("DELETE FROM documents WHERE id = $1 AND user_id = $2", [
+    req.params.id,
+    req.userId,
+  ]);
+  if (result.rowCount === 0) return res.status(404).json({ error: "Документ не найден" });
+  res.json({ ok: true });
+});
+
 // Оригинал файла — PDF/PNG/JPG ровно в том виде, в каком он был загружен.
 router.get("/:id/file", async (req, res) => {
   const result = await pool.query(

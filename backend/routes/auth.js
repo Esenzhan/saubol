@@ -2,6 +2,7 @@ import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import pool from "../db/pool.js";
+import { requireAuth } from "../middleware/auth.js";
 
 const router = Router();
 
@@ -9,6 +10,9 @@ router.post("/register", async (req, res) => {
   const { email, password, fullName } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Email и пароль обязательны" });
+  }
+  if (!fullName || !fullName.trim()) {
+    return res.status(400).json({ error: "Укажите имя" });
   }
   try {
     const existing = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
@@ -53,6 +57,16 @@ router.post("/login", async (req, res) => {
     console.error(err);
     res.status(500).json({ error: "Не удалось выполнить вход" });
   }
+});
+
+// Текущий пользователь — для страницы «Настройки» (имя/email) и показа
+// ссылки на админ-панель только администраторам.
+router.get("/me", requireAuth, async (req, res) => {
+  const result = await pool.query("SELECT id, email, full_name, is_admin FROM users WHERE id = $1", [
+    req.userId,
+  ]);
+  if (result.rows.length === 0) return res.status(404).json({ error: "Пользователь не найден" });
+  res.json({ user: result.rows[0] });
 });
 
 export default router;

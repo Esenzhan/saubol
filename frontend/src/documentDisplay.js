@@ -1,12 +1,12 @@
 // Two dates matter for a document: the date printed on the lab report
 // itself (document_date), and the date it was added to the site
-// (created_at). display_name from the AI (or a manual import) is just the
-// bare content description ("Общий анализ крови") — the "от <date>" suffix
-// shown in the UI is always the upload date, appended here rather than
-// baked into the stored name, so it can't drift out of sync with created_at.
+// (created_at). The title is just the bare content description
+// ("Общий анализ крови") — the upload date is deliberately NOT part of it:
+// it's secondary information, shown only inside the expanded details via
+// documentUploadDate(). The date users actually care about is the one on
+// the document itself, shown greyed-out under the title.
 export function documentTitle(doc) {
-  if (!doc.display_name) return doc.original_filename;
-  return `${doc.display_name} от ${formatDate(doc.created_at)}`;
+  return doc.display_name || doc.original_filename;
 }
 
 // The secondary, greyed-out date shown under a document's title — the date
@@ -15,6 +15,11 @@ export function documentTitle(doc) {
 // failed, or the document doesn't carry one).
 export function documentSecondaryDate(doc) {
   return doc.document_date ? formatCalendarDate(doc.document_date) : formatDate(doc.created_at);
+}
+
+// Upload date for the expanded details view ("Загружен 19.07.2026").
+export function documentUploadDate(doc) {
+  return formatDate(doc.created_at);
 }
 
 function formatDate(value) {

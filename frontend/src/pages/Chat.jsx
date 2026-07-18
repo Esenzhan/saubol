@@ -68,7 +68,13 @@ export default function Chat() {
   }
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    // Мобильная высота вычитает всё, что не принадлежит чату: шапку,
+    // верхний отступ <main>, нижнее меню и safe-area под ним — иначе поле
+    // ввода оказывается за нижним баром и до него не доскроллить. -mb-24
+    // гасит pb-24 у <main> (он нужен скроллящимся страницам, чат не
+    // скроллится страницей вообще). На десктопе нижнего бара нет — там
+    // достаточно вычесть вертикальные паддинги <main> (py-8 = 4rem).
+    <div className="flex flex-col h-[calc(100dvh-9.5rem-env(safe-area-inset-bottom))] -mb-24 md:mb-0 md:h-[calc(100vh-4rem)]">
       <p className="font-display font-light tracking-tight text-3xl mb-1">Ассистент</p>
       <p className="text-ink/60 mb-6">Задайте вопрос по своим анализам и медкарте</p>
 
