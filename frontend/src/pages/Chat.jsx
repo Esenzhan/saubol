@@ -57,7 +57,7 @@ export default function Chat() {
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Спросите о своих анализах…"
-          className="flex-1 rounded-md border border-ink/15 bg-surface px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-moss"
+          className="flex-1 rounded-md border border-ink/15 bg-surface px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-moss"
         />
         <button
           type="submit"

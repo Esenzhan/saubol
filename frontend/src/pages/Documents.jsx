@@ -251,7 +251,7 @@ function ReviewField({ row, onChange }) {
           value={isQualitative ? row.value_text ?? "" : row.value ?? ""}
           onChange={(e) => onChange(isQualitative ? { value_text: e.target.value } : { value: e.target.value })}
           placeholder={isQualitative ? "результат" : "значение"}
-          className="min-w-0 flex-1 text-sm bg-paper border border-ink/15 rounded-md px-2 py-1.5"
+          className="min-w-0 flex-1 text-base bg-paper border border-ink/15 rounded-md px-2 py-1.5"
         />
         {!isQualitative && (
           <input
@@ -259,7 +259,7 @@ function ReviewField({ row, onChange }) {
             value={row.unit ?? ""}
             onChange={(e) => onChange({ unit: e.target.value })}
             placeholder="ед."
-            className="w-16 shrink-0 text-sm bg-paper border border-ink/15 rounded-md px-2 py-1.5"
+            className="w-16 shrink-0 text-base bg-paper border border-ink/15 rounded-md px-2 py-1.5"
           />
         )}
       </div>
@@ -283,7 +283,7 @@ function AddBiomarkerPicker({ catalog, onPick, onClose }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Поиск показателя из истории…"
-        className="w-full text-sm bg-paper border border-ink/15 rounded-md px-2 py-1.5 mb-2"
+        className="w-full text-base bg-paper border border-ink/15 rounded-md px-2 py-1.5 mb-2"
       />
       <div className="max-h-40 overflow-y-auto space-y-0.5">
         {matches.map((c) => (
@@ -303,7 +303,7 @@ function AddBiomarkerPicker({ catalog, onPick, onClose }) {
         <input
           type="text"
           placeholder="или новое название показателя"
-          className="min-w-0 flex-1 text-sm bg-paper border border-ink/15 rounded-md px-2 py-1.5"
+          className="min-w-0 flex-1 text-base bg-paper border border-ink/15 rounded-md px-2 py-1.5"
           onKeyDown={(e) => {
             if (e.key === "Enter" && e.currentTarget.value.trim()) {
               onPick({ name: e.currentTarget.value.trim(), unit: "" });
@@ -379,8 +379,8 @@ function ReviewPanel({ documentId, onClose, onDone }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-ink/40 p-0 sm:p-4">
-      <div className="bg-paper w-full sm:max-w-md sm:rounded-lg max-h-[90vh] overflow-y-auto p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
+      <div className="bg-paper w-full max-w-md rounded-lg max-h-[85vh] overflow-y-auto p-5">
         <div className="flex items-center justify-between mb-1">
           <p className="font-display font-light tracking-tight text-xl">Проверьте показатели</p>
           <button type="button" onClick={onClose} className="text-ink/40 hover:text-ink text-sm">

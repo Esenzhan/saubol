@@ -6,6 +6,16 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Hide the native scrollbar chrome everywhere (mobile's edge indicator,
+   desktop's persistent gutter) while leaving scrolling itself untouched. */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* old Edge/IE */
+}
+*::-webkit-scrollbar {
+  display: none; /* Safari/Chrome */
+}
+
 :root {
   color-scheme: light;
   --ink: 35 42 44;
