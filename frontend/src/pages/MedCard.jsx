@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceArea, ResponsiveContainer } from "recharts";
 import { api } from "../api/client.js";
@@ -27,6 +27,82 @@ function ChartDot({ cx, cy, payload, colors }) {
   if (cx == null || cy == null) return null;
   if (!payload.flagged) return <circle cx={cx} cy={cy} r={3} fill={colors.line} />;
   return <circle cx={cx} cy={cy} r={5} fill={colors.flagged} fillOpacity={0.25} stroke={colors.flagged} strokeWidth={2} />;
+}
+
+function BiomarkerPicker({ groups, value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e) {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [open]);
+
+  const filteredGroups = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return groups;
+    return groups
+      .map((g) => ({ ...g, names: g.names.filter((n) => n.toLowerCase().includes(q)) }))
+      .filter((g) => g.names.length > 0);
+  }, [groups, query]);
+
+  function pick(name) {
+    onChange(name);
+    setOpen(false);
+    setQuery("");
+  }
+
+  return (
+    <div className="relative w-full sm:w-auto" ref={containerRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full sm:w-auto max-w-full text-sm border border-ink/15 rounded-md px-3 py-1.5 bg-surface text-left flex items-center gap-2"
+      >
+        <span className="truncate">{value || "Выберите показатель"}</span>
+        <svg className="w-3 h-3 shrink-0 text-ink/40 ml-auto" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 left-0 right-0 sm:left-auto sm:w-80 max-w-[90vw] rounded-md border border-ink/15 bg-surface shadow-lg">
+          <div className="p-2 border-b border-ink/10">
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Поиск показателя…"
+              className="w-full text-base bg-paper border border-ink/15 rounded-md px-2 py-1.5"
+            />
+          </div>
+          <div className="max-h-64 overflow-y-auto py-1">
+            {filteredGroups.map((g) => (
+              <div key={g.label}>
+                <p className="px-3 pt-2 pb-1 text-xs uppercase tracking-wide text-ink/40">{g.label}</p>
+                {g.names.map((n) => (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => pick(n)}
+                    className={`w-full text-left px-3 py-1.5 text-sm hover:bg-paper ${n === value ? "text-moss font-medium" : ""}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+            ))}
+            {filteredGroups.length === 0 && <p className="px-3 py-3 text-sm text-ink/40">Ничего не найдено</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ChartTooltip({ active, payload, colors }) {
@@ -130,21 +206,7 @@ export default function MedCard() {
             Динамика показателя{unit && <span className="text-ink/50 font-normal"> ({unit})</span>}
           </p>
           {names.length > 0 && (
-            <select
-              value={selectedName || ""}
-              onChange={(e) => setSelectedName(e.target.value)}
-              className="w-full sm:w-auto max-w-full text-sm border border-ink/15 rounded-md px-2 py-1 bg-surface"
-            >
-              {groups.map((g) => (
-                <optgroup key={g.label} label={g.label}>
-                  {g.names.map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <BiomarkerPicker groups={groups} value={selectedName} onChange={setSelectedName} />
           )}
         </div>
         {hasRange && (

@@ -7,6 +7,7 @@ import pool from "../db/pool.js";
 import { requireAuth } from "../middleware/auth.js";
 import { extractTextFromDocument } from "../services/ocr.js";
 import { analyzeDocument } from "../services/ai.js";
+import { canonicalizeBiomarkerName } from "../services/textNormalize.js";
 
 const router = Router();
 
@@ -105,14 +106,22 @@ async function processAnalysisDocument(documentId, filePath, userId) {
       [rawText, displayName, folder, documentDate, documentId]
     );
 
+    // Snapshot this user's existing biomarker spellings once per document so
+    // a fresh extraction that differs only by a Cyrillic/Latin look-alike
+    // letter (or casing/whitespace) merges into the established name
+    // instead of quietly splitting the medcard history into two entries.
+    const existingNamesRes = await pool.query("SELECT DISTINCT name FROM biomarkers WHERE user_id = $1", [userId]);
+    const existingNames = existingNamesRes.rows.map((r) => r.name);
+
     for (const b of biomarkers) {
+      const name = canonicalizeBiomarkerName(b.name, existingNames);
       await pool.query(
         `INSERT INTO biomarkers (user_id, document_id, name, value, value_text, unit, ref_range_low, ref_range_high, measured_at, flagged_for_review, confirmed)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           userId,
           documentId,
-          b.name,
+          name,
           b.value,
           b.value_text,
           b.unit,
