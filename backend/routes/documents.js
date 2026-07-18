@@ -177,8 +177,29 @@ router.get("/:id", async (req, res) => {
   // Insertion order (id) matches the order the AI read the biomarkers off
   // the original document — alphabetical would scramble that, making it
   // harder to cross-check the extracted values against the source file.
+  //
+  // ref_range_low/high are overridden with the most recent confirmed range
+  // on record for that biomarker name (LEFT JOIN LATERAL below), rather than
+  // this document's own printed range: different lab documents sometimes
+  // print slightly different ranges for the same biomarker (method/equipment
+  // differences, or one document missing the norm entirely), which made the
+  // same value read as normal in one document and abnormal in another. A
+  // single reference range per biomarker keeps that judgment consistent
+  // everywhere the value is shown, matching the medcard chart.
   const biomarkers = await pool.query(
-    "SELECT * FROM biomarkers WHERE document_id = $1 ORDER BY id",
+    `SELECT b.id, b.document_id, b.name, b.value, b.value_text, b.unit, b.measured_at,
+            b.flagged_for_review, b.confirmed, canon.ref_range_low, canon.ref_range_high
+     FROM biomarkers b
+     LEFT JOIN LATERAL (
+       SELECT ref_range_low, ref_range_high
+       FROM biomarkers hist
+       WHERE hist.user_id = b.user_id AND hist.name = b.name AND hist.confirmed = true
+         AND hist.ref_range_low IS NOT NULL AND hist.ref_range_high IS NOT NULL
+       ORDER BY hist.measured_at DESC NULLS LAST, hist.created_at DESC
+       LIMIT 1
+     ) canon ON true
+     WHERE b.document_id = $1
+     ORDER BY b.id`,
     [req.params.id]
   );
 

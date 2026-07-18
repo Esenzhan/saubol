@@ -179,27 +179,23 @@ export default function MedCard() {
   const refHigh = latestRange ? Number(latestRange.ref_range_high) : null;
   const hasRange = refLow != null && refHigh != null;
 
-  // Some documents don't carry a printed reference range for a given
-  // biomarker (OCR/extraction found the value but not the norm next to it)
-  // — ref_range_low/high on that row are NULL. Falling back to the range
-  // shown elsewhere in this card (refLow/refHigh) means such a point still
-  // gets flagged when its value is clearly abnormal, instead of silently
-  // defaulting to "in range" for lack of data to compare against.
+  // Different lab documents can print slightly different reference ranges
+  // for the same biomarker (different equipment/method, or one document
+  // simply missing the printed norm) — comparing each point against its own
+  // row's range made the trend line flip which points count as "abnormal"
+  // depending on which document a value happened to come from. Every point
+  // is compared against the one range shown on this card (refLow/refHigh)
+  // instead, so the whole series reads against a single consistent norm.
   const series = useMemo(
     () =>
-      numericRows.map((b) => {
-        const value = Number(b.value);
-        const low = b.ref_range_low != null ? Number(b.ref_range_low) : refLow;
-        const high = b.ref_range_high != null ? Number(b.ref_range_high) : refHigh;
-        return {
-          date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
-          value,
-          unit: b.unit,
-          flagged: b.flagged_for_review,
-          outOfRange: (low != null && value < low) || (high != null && value > high),
-        };
-      }),
-    [numericRows, refLow, refHigh]
+      numericRows.map((b) => ({
+        date: b.measured_at ? new Date(b.measured_at).toLocaleDateString("ru-RU") : "—",
+        value: Number(b.value),
+        unit: b.unit,
+        flagged: b.flagged_for_review,
+        outOfRange: hasRange && (Number(b.value) < refLow || Number(b.value) > refHigh),
+      })),
+    [numericRows, hasRange, refLow, refHigh]
   );
 
   // Include the reference range in the Y domain — otherwise a patient's values
