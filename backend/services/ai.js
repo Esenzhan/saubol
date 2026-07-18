@@ -1,25 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { classifyAnalysisSubfolder } from "./folderClassifier.js";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = "claude-sonnet-4-6";
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-
-// Подпапки внутри «Анализы» на странице «Документы» (см.
-// frontend/src/documentFolders.js — держите оба списка в синхроне при
-// изменении). Верхнеуровневая папка документа теперь выбирается
-// пользователем при загрузке (см. FOLDER документов в documents.js), а не
-// ИИ — analyzeDocument вызывается только для документов, загруженных в
-// «Анализы», и лишь уточняет, какой это конкретно тип анализа.
-export const FOLDERS = [
-  "Общий анализ крови (ОАК)",
-  "Биохимия крови",
-  "Витамины и микроэлементы",
-  "Иммунология / Аллергология",
-  "Общий анализ мочи (ОАМ)",
-  "Паразитология и инфекции",
-  "Комплексные анализы",
-];
 
 function toNumberOrNull(v) {
   if (v === null || v === undefined || v === "") return null;
@@ -73,18 +58,22 @@ export function isImplausibleValue(value, unit, refLow, refHigh) {
 function sanitizeClassification(parsed) {
   const displayName =
     typeof parsed?.display_name === "string" && parsed.display_name.trim() ? parsed.display_name.trim() : null;
-  const folder = FOLDERS.includes(parsed?.folder) ? parsed.folder : "Комплексные анализы";
   const documentDate =
     typeof parsed?.document_date === "string" && DATE_RE.test(parsed.document_date) ? parsed.document_date : null;
-  return { displayName, folder, documentDate };
+  return { displayName, documentDate };
 }
 
 /**
- * Извлекает биомаркеры и классифицирует документ (подпапка внутри «Анализы»
- * + человекочитаемое название + дата для сортировки) одним запросом к
- * модели — экономит токены по сравнению с несколькими отдельными вызовами.
- * Вызывается только для документов, загруженных пользователем в «Анализы» —
- * для остальных папок биомаркеры не извлекаются (см. documents.js).
+ * Извлекает биомаркеры и придумывает человекочитаемое название + дату
+ * (для сортировки) одним запросом к модели — экономит токены по сравнению
+ * с несколькими отдельными вызовами. Вызывается только для документов,
+ * загруженных пользователем в «Анализы» — для остальных папок биомаркеры
+ * не извлекаются (см. documents.js).
+ *
+ * Подпапка (folder) в этот запрос не входит и моделью не определяется —
+ * её вычисляет classifyAnalysisSubfolder() правилами по именам уже
+ * извлечённых биомаркеров, см. folderClassifier.js.
+ *
  * Возвращает { displayName, folder, documentDate, biomarkers: [...] }.
  */
 export async function analyzeDocument(rawText) {
@@ -93,16 +82,14 @@ export async function analyzeDocument(rawText) {
     max_tokens: 2500,
     system:
       "Ты анализируешь текст лабораторного анализа, полученный через OCR, и делаешь две вещи.\n\n" +
-      "1) Классифицируешь документ: display_name — короткое человекочитаемое название вида " +
+      "1) Придумываешь display_name — короткое человекочитаемое название документа вида " +
       '"Общий анализ крови от 22.08.2025" ' +
-      "(дату бери из бланка — дату регистрации заявки/забора биоматериала, а не дату печати бланка); " +
-      "document_date — эта же дата в формате YYYY-MM-DD, отдельным полем (нужна для сортировки списка документов). " +
-      "Если документ охватывает несколько дат (архив за период) — возьми самую позднюю дату из документа. " +
-      'folder — ровно одно значение из списка: ' +
-      FOLDERS.map((f) => `"${f}"`).join(", ") +
-      '. Если в документе несколько разнородных панелей одного приёма (например, гормоны + ОАК + IgE) — folder ' +
-      '= "Комплексные анализы", а в display_name перечисли основные типы через запятую в скобках, ' +
-      'например "Комплексный анализ (гормоны, ОАК, IgE) от 20.02.2024". Если не уверен — "Комплексные анализы".\n\n' +
+      "(дату бери из бланка — дату регистрации заявки/забора биоматериала, а не дату печати бланка). " +
+      "Если в документе несколько разнородных панелей одного приёма (например, гормоны + ОАК + IgE) — " +
+      'перечисли основные типы через запятую в скобках, например ' +
+      '"Комплексный анализ (гормоны, ОАК, IgE) от 20.02.2024". ' +
+      "document_date — та же дата в формате YYYY-MM-DD, отдельным полем (нужна для сортировки списка документов). " +
+      "Если документ охватывает несколько дат (архив за период) — возьми самую позднюю дату из документа.\n\n" +
       "2) Извлекаешь медицинские показатели из текста. Текст может содержать ошибки распознавания: " +
       "пропущенные десятичные разделители (запятая/точка), слипшиеся цифры. Читай значения в контексте: " +
       "если результат явно противоречит физическому смыслу (например, значение в процентах больше 100%) " +
@@ -114,7 +101,7 @@ export async function analyzeDocument(rawText) {
       "положи его в поле value_text, а value оставь null. Не пропускай строки только потому, что в них нет " +
       "числа — качественный отрицательный результат так же важен для истории болезни, как и числовой в норме.\n\n" +
       "Отвечай ТОЛЬКО валидным JSON-объектом вида " +
-      '{"display_name": string, "document_date": string|null, "folder": string, "biomarkers": [{"name": string, "value": number|null, ' +
+      '{"display_name": string, "document_date": string|null, "biomarkers": [{"name": string, "value": number|null, ' +
       '"value_text": string|null, "unit": string|null, "ref_range_low": number|null, "ref_range_high": number|null, ' +
       '"measured_at": string|null}]}. Ровно одно из value/value_text у каждого биомаркера должно быть заполнено. ' +
       "measured_at в формате YYYY-MM-DD. Никакого текста до или после JSON. Если показателей нет — biomarkers: [].",
@@ -131,15 +118,16 @@ export async function analyzeDocument(rawText) {
     parsed = JSON.parse(text.trim().replace(/^```json|```$/g, ""));
   } catch (err) {
     console.error("Не удалось распарсить ответ модели как JSON:", text);
-    return { displayName: null, folder: "Другое", documentDate: null, biomarkers: [] };
+    return { displayName: null, folder: "Комплексные анализы", documentDate: null, biomarkers: [] };
   }
 
-  const { displayName, folder, documentDate } = sanitizeClassification(parsed);
+  const { displayName, documentDate } = sanitizeClassification(parsed);
   const biomarkers = sanitizeBiomarkers(parsed?.biomarkers).map((b) => ({
     ...b,
     flagged_for_review: isImplausibleValue(b.value, b.unit, b.ref_range_low, b.ref_range_high),
     confirmed: false, // ждёт проверки человеком на экране подтверждения показателей
   }));
+  const folder = classifyAnalysisSubfolder(biomarkers.map((b) => b.name));
 
   return { displayName, folder, documentDate, biomarkers };
 }
