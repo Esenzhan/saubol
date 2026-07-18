@@ -32,12 +32,11 @@ function latestDate(docs) {
   return latest;
 }
 
-// Groups a flat document list into the tree above, newest-first at every
-// level: subfolders within "Анализы" are ordered by their own most recent
-// document, and the top-level folders are ordered by the most recent
-// document anywhere inside them. Top-level entries without children get
-// their documents directly; anything with an unrecognized/missing folder
-// falls into "Другое", always last regardless of date.
+// Groups a flat document list into the tree above. Top-level folders keep
+// the fixed order defined in FOLDER_TREE above; only the subfolders within
+// "Анализы" are sorted, newest document first. Top-level entries without
+// children get their documents directly; anything with an unrecognized/
+// missing folder falls into "Другое", always last.
 export function groupDocumentsByFolder(documents) {
   const byFolder = new Map();
   for (const doc of documents) {
@@ -45,10 +44,6 @@ export function groupDocumentsByFolder(documents) {
     if (!byFolder.has(key)) byFolder.set(key, []);
     byFolder.get(key).push(doc);
   }
-
-  const byRecency = (a, b) => (latestDate(b.documents ?? b.subfolders.flatMap((s) => s.documents)) || "").localeCompare(
-    latestDate(a.documents ?? a.subfolders.flatMap((s) => s.documents)) || ""
-  );
 
   const result = [];
   for (const node of FOLDER_TREE) {
@@ -63,7 +58,6 @@ export function groupDocumentsByFolder(documents) {
       result.push({ label: node.label, documents: byFolder.get(node.label), count: byFolder.get(node.label).length });
     }
   }
-  result.sort(byRecency);
 
   if (byFolder.has(OTHER_LABEL)) {
     const docs = byFolder.get(OTHER_LABEL);
