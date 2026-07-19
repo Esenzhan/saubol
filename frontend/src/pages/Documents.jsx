@@ -114,7 +114,7 @@ function biomarkerDeviation(b) {
   return null;
 }
 
-function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete, onMove }) {
+function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete, onMove, nested }) {
   const canExpand = doc.status !== "processing";
   const [opening, setOpening] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -142,8 +142,18 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete, onMove }) 
     }
   }
 
+  // Внутри раскрытой подпапки документ — не такая же карточка, как сама
+  // подпапка (иначе на глаз не отличить, где заголовок папки, а где её
+  // содержимое): более лёгкий фон вместо bg-surface, тоньше рамка, компактнее
+  // паддинг.
   return (
-    <div className="rounded-md border border-ink/10 bg-surface px-4 py-3">
+    <div
+      className={
+        nested
+          ? "rounded-md border border-ink/5 bg-paper px-3 py-2.5"
+          : "rounded-md border border-ink/10 bg-surface px-4 py-3"
+      }
+    >
       <div className="flex items-center justify-between gap-3">
         <button
           type="button"
@@ -277,21 +287,30 @@ function DocumentRow({ doc, isExpanded, onToggle, onReview, onDelete, onMove }) 
   );
 }
 
-function FolderSection({ label, count, nested, children }) {
+function FolderSection({ label, count, children }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={nested ? "ml-4 mt-2" : "mb-3"}>
+    <div className="mb-3">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center justify-between rounded-md border border-ink/10 bg-surface px-4 py-3 text-left hover:border-moss/40 transition-colors ${
-          nested ? "text-sm" : "font-medium"
+        className={`w-full flex items-center gap-2 rounded-md border bg-surface px-4 py-3 text-left font-medium transition-colors ${
+          open ? "border-moss/30" : "border-ink/10 hover:border-moss/40"
         }`}
       >
-        <span>{label}</span>
-        <span className="text-xs text-ink/40">{count} · {open ? "свернуть" : "открыть"}</span>
+        <svg className="w-4 h-4 shrink-0 text-ink/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+        </svg>
+        <span className="flex-1 truncate">{label}</span>
+        <span className="text-xs text-ink/40 shrink-0">{count} · {open ? "свернуть" : "открыть"}</span>
       </button>
-      {open && <div className="mt-2 space-y-2">{children}</div>}
+      {/* Отступ + линия слева — документы читаются как содержимое папки
+          выше, а не как соседние карточки того же уровня. */}
+      {open && (
+        <div className="mt-2 ml-3 pl-3 space-y-2 border-l-2 border-ink/10">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
@@ -309,9 +328,9 @@ function FolderDetail({ folder, uploading, onUpload, onBack, expandedId, onToggl
 
       {folder.subfolders
         ? folder.subfolders.map((sub) => (
-            <FolderSection key={sub.label} label={sub.label} count={sub.documents.length} nested={false}>
+            <FolderSection key={sub.label} label={sub.label} count={sub.documents.length}>
               {sub.documents.map((doc) => (
-                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} onMove={onMove} />
+                <DocumentRow key={doc.id} doc={doc} isExpanded={expandedId === doc.id} onToggle={onToggle} onReview={onReview} onDelete={onDelete} onMove={onMove} nested />
               ))}
             </FolderSection>
           ))
