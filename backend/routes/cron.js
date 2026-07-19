@@ -4,12 +4,21 @@ import pool from "../db/pool.js";
 
 const router = Router();
 
-if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
-  webpush.setVapidDetails(
-    process.env.VAPID_SUBJECT || "mailto:saubol@example.com",
-    process.env.VAPID_PUBLIC_KEY,
-    process.env.VAPID_PRIVATE_KEY
-  );
+// setVapidDetails validates key length synchronously and throws if it
+// doesn't like them — a malformed/mistyped env var must not take down the
+// entire server (documents, medcard, chat, everything) over a feature as
+// secondary as push reminders. Missing/bad keys just mean push sends will
+// fail later (caught per-subscription below), not that the app won't boot.
+try {
+  if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+    webpush.setVapidDetails(
+      process.env.VAPID_SUBJECT || "mailto:saubol@example.com",
+      process.env.VAPID_PUBLIC_KEY,
+      process.env.VAPID_PRIVATE_KEY
+    );
+  }
+} catch (err) {
+  console.error("Некорректные VAPID-ключи, push-уведомления отключены:", err.message);
 }
 
 // event_date приходит из pg как чистая строка "YYYY-MM-DD" (см. кастомный
