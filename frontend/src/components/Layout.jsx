@@ -19,6 +19,11 @@ const NAV_ITEMS = [
     icon: '<path d="M3 3v18h18"/><path d="m7 14 3-3 3 3 5-6"/>',
   },
   {
+    to: "/calendar",
+    label: "Календарь",
+    icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/>',
+  },
+  {
     to: "/chat",
     label: "Ассистент",
     icon: '<path d="M4 4h16v12H8l-4 4V4Z"/>',
@@ -181,14 +186,18 @@ export default function Layout({ children }) {
         {children}
       </main>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 border-t border-ink/10 bg-paper/90 backdrop-blur flex justify-between px-4 pb-[env(safe-area-inset-bottom)]">
+      {/* 6 пунктов (после добавления «Календарь») уже не оставляют места для
+          px-4 + px-1 на каждый — «Настройки» вылезал за правый край экрана
+          на 375px. px-1.5 на контейнере и без горизонтального паддинга на
+          самом пункте — таким пунктам ширину задаёт только их контент. */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 border-t border-ink/10 bg-paper/90 backdrop-blur flex justify-between px-1.5 pb-[env(safe-area-inset-bottom)]">
         {NAV_ITEMS.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
             end={item.end}
             className={({ isActive }) =>
-              `flex flex-col items-center gap-0.5 px-1 pt-2.5 pb-2 text-[11px] transition-colors ${
+              `flex flex-col items-center gap-0.5 pt-2.5 pb-2 text-[11px] transition-colors ${
                 isActive ? "text-moss font-medium" : "text-ink/50"
               }`
             }

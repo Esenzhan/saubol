@@ -6,6 +6,8 @@ import documentsRoutes from "./routes/documents.js";
 import recordsRoutes from "./routes/records.js";
 import chatRoutes from "./routes/chat.js";
 import adminRoutes from "./routes/admin.js";
+import calendarRoutes from "./routes/calendar.js";
+import cronRoutes from "./routes/cron.js";
 
 dotenv.config();
 
@@ -30,6 +32,8 @@ app.use("/api/documents", documentsRoutes);
 app.use("/api/records", recordsRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/calendar", calendarRoutes);
+app.use("/api/cron", cronRoutes);
 
 app.use((err, req, res, next) => {
   console.error(err);

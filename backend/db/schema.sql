@@ -78,6 +78,35 @@ CREATE TABLE IF NOT EXISTS medication_doses (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Календарь: события с датой + напоминание за N дней (по умолчанию 7).
+-- notified_at ставится джобой напоминаний (см. routes/cron.js) один раз —
+-- не строка "было ли уведомление", а когда именно оно ушло, на случай
+-- будущей отладки пропущенных напоминаний.
+CREATE TABLE IF NOT EXISTS calendar_events (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  details TEXT,
+  event_date DATE NOT NULL,
+  remind_before_days INTEGER NOT NULL DEFAULT 7,
+  notified_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Web Push подписки браузера/устройства. Один пользователь может иметь
+-- несколько подписок (телефон + компьютер) — уведомление о напоминании
+-- уходит на все сразу. endpoint уникален сам по себе (выдаётся push-
+-- сервисом браузера), поэтому повторная подписка с того же устройства
+-- обновляет запись, а не плодит дубликаты.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- История AI-чата
 CREATE TABLE IF NOT EXISTS chat_messages (
   id SERIAL PRIMARY KEY,
@@ -92,3 +121,5 @@ CREATE INDEX IF NOT EXISTS idx_biomarkers_user_name ON biomarkers(user_id, name)
 CREATE INDEX IF NOT EXISTS idx_medcard_user ON medcard_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_medication_doses_user_name ON medication_doses(user_id, name);
+CREATE INDEX IF NOT EXISTS idx_calendar_events_user_date ON calendar_events(user_id, event_date);
+CREATE INDEX IF NOT EXISTS idx_push_subscriptions_user ON push_subscriptions(user_id);

@@ -95,6 +95,12 @@ export const api = {
   sendChatMessage: (message) => request("/chat", { method: "POST", body: JSON.stringify({ message }) }),
 
   listAdminUsers: () => request("/admin/users"),
+
+  listCalendarEvents: () => request("/calendar/events"),
+  addCalendarEvent: (body) => request("/calendar/events", { method: "POST", body: JSON.stringify(body) }),
+  deleteCalendarEvent: (id) => request(`/calendar/events/${id}`, { method: "DELETE" }),
+  subscribePush: (subscription) => request("/calendar/push/subscribe", { method: "POST", body: JSON.stringify(subscription) }),
+  unsubscribePush: (endpoint) => request("/calendar/push/unsubscribe", { method: "POST", body: JSON.stringify({ endpoint }) }),
 };
 
 export { getToken };
