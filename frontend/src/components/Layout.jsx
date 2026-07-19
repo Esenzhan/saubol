@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 
 const NAV_ITEMS = [
   {
@@ -47,7 +47,12 @@ function NavIcon({ path, className }) {
 
 export default function Layout({ children }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("sidebarCollapsed") === "true");
+  // Медкарта — единственная страница, где контент — это в основном широкие
+  // графики, а не текст на чтение; остальным страницам узкая колонка
+  // (max-w-4xl) остаётся удобнее для восприятия текста/карточек.
+  const isMedCard = location.pathname === "/medcard";
 
   function handleLogout() {
     localStorage.removeItem("token");
@@ -168,7 +173,11 @@ export default function Layout({ children }) {
         </button>
       </aside>
 
-      <main className={`flex-1 px-4 py-6 md:px-10 md:py-8 pb-24 md:pb-8 ${collapsed ? "md:max-w-none" : "md:max-w-4xl"}`}>
+      <main
+        className={`flex-1 px-4 py-6 md:px-10 md:py-8 pb-24 md:pb-8 ${
+          collapsed ? "md:max-w-none" : isMedCard ? "md:max-w-[84rem]" : "md:max-w-4xl"
+        }`}
+      >
         {children}
       </main>
 
