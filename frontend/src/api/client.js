@@ -85,6 +85,12 @@ export const api = {
   listMedcard: (section) => request(`/records/medcard${section ? `?section=${encodeURIComponent(section)}` : ""}`),
   addMedcardEntry: (body) => request("/records/medcard", { method: "POST", body: JSON.stringify(body) }),
 
+  listMedications: (name) => request(`/records/medications${name ? `?name=${encodeURIComponent(name)}` : ""}`),
+  listMedicationNames: () => request("/records/medications/names"),
+  listMedicationCatalog: () => request("/records/medications/catalog"),
+  addMedicationDose: (body) => request("/records/medications", { method: "POST", body: JSON.stringify(body) }),
+  deleteMedicationDose: (id) => request(`/records/medications/${id}`, { method: "DELETE" }),
+
   getChatHistory: () => request("/chat"),
   sendChatMessage: (message) => request("/chat", { method: "POST", body: JSON.stringify({ message }) }),
 

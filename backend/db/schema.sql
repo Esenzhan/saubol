@@ -65,6 +65,19 @@ CREATE TABLE IF NOT EXISTS medcard_entries (
   created_at TIMESTAMPTZ DEFAULT now()
 );
 
+-- Приём лекарств по датам (для графика динамики дозы). Только то, что
+-- пользователь ввёл вручную — нет ИИ-извлечения дозировок из документов,
+-- поэтому поля подтверждения (confirmed) здесь не нужны.
+CREATE TABLE IF NOT EXISTS medication_doses (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,          -- напр. 'Метипред'
+  dose_value NUMERIC NOT NULL, -- 0 — приём прекращён на эту дату, не NULL
+  dose_unit TEXT,              -- напр. 'мг'
+  taken_at DATE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- История AI-чата
 CREATE TABLE IF NOT EXISTS chat_messages (
   id SERIAL PRIMARY KEY,
@@ -78,3 +91,4 @@ CREATE INDEX IF NOT EXISTS idx_documents_user ON documents(user_id);
 CREATE INDEX IF NOT EXISTS idx_biomarkers_user_name ON biomarkers(user_id, name);
 CREATE INDEX IF NOT EXISTS idx_medcard_user ON medcard_entries(user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_messages(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_medication_doses_user_name ON medication_doses(user_id, name);
