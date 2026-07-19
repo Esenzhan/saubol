@@ -1,0 +1,21 @@
+name: Calendar reminders
+
+# Render's free tier puts the backend to sleep after ~15 min without
+# incoming requests, so a reminder check can't live on a setInterval inside
+# the server process itself — it might be asleep at exactly the moment it's
+# supposed to fire. This ping both wakes the service up and triggers the
+# check; the endpoint's own due-window logic (see backend/routes/cron.js)
+# tolerates a missed day, so occasional cold-start slowness isn't fatal.
+on:
+  schedule:
+    - cron: "0 5 * * *" # 05:00 UTC ≈ 10:00 в Алматы/Астане (UTC+5)
+  workflow_dispatch: {}
+
+jobs:
+  check-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping /api/cron/check-reminders
+        run: |
+          curl -sf -X POST "https://saubol-backend.onrender.com/api/cron/check-reminders" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
